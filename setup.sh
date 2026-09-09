@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 if [[ ! -f ./.setup.sh.log ]]; then
    echo "Creating log file"
    touch ./.setup.sh.log
@@ -206,8 +205,10 @@ elif [[ $isWaywallInstalled -eq 0 ]]; then
    append_log "[INFO] waywall.rpm installed successfully"
 fi
 
+TARGET_USER="${SUDO_USER:-$(whoami)}"
+
 append_log "[INFO] Starting waywall configuration (using generic config)"
-append_log "[INFO] Using target user: $TARGET_USER at $TARGET_HOME"
+append_log "[INFO] Using target user: $TARGET_USER at $HOME"
 append_log "[INFO] Backing up existing waywall config if present"
 if [[ -d "$HOME"/.config/waywall ]]; then
    append_log "[INFO] Existing waywall config found, backing up to $HOME/.config/waywall.bkp"
