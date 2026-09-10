@@ -64,16 +64,7 @@ function sigIntHandler {
 }
 trap sigIntHandler SIGINT
 
-declare -A setupChoices
 
-setupChoices[installTemurinJDKS]=true
-setupChoices[installWaywall]=true
-setupChoices[useGenericConfig]=false
-setupChoices[addOneShotCrosshair]=false
-setupChoices[addNinbotOpenOnF3C]=false
-# setting this true automatically sets up all parameters(greenboat, sens std deviation ) for boateye using godsens , 
-# you still have to setup waywall sens using calculator provided in guide
-setupChoices[ninbotboateyepresetup]=true
 
 # set to used with URI parameter when launching through cmd for prism but it still requires usr input instead of auto downloading 
 # so probably not going 
@@ -214,81 +205,7 @@ fi
 
 TARGET_USER="${SUDO_USER:-$(whoami)}"
 
-if [[ $setupChoices[useGenericConfig] == true ]]; then
 
-   append_log i "Starting waywall configuration (using generic config)"
-   append_log i "Using target user: $TARGET_USER at $HOME"
-   append_log i "Backing up existing waywall config if present"
-   if [[ -d "$HOME"/.config/waywall ]]; then
-      append_log i "Existing waywall config found, backing up to $HOME/.config/waywall.bkp"
-      count=1
-      while [[ -d "$HOME"/.config/waywall.bkp$count ]]; do
-         count=$((count + 1))
-         
-      mv "$HOME"/.config/waywall "$HOME"/.config/waywall.bkp$count
-      done
-      append_log i "Existing waywall config backed up to $HOME/.config/waywall.bkp$count"
-   fi
-
-   sudo dnf -y install git
-   didGitInstall=$?
-   if [[ $didGitInstall -ne 0 ]]; then
-      append_log e "Failed to install git"
-      exit 1
-   fi
-   append_log i "git installed successfully"
-
-   while true; do
-      read -p "Do you want to use 1080(default/0) or 1440(1) config for waywall?(0/1): " waywallConfigChoice
-      if [[ $waywallConfigChoice == "0" ]]; then
-         append_log i "User chose 1080 config for waywall"
-      elif [[ $waywallConfigChoice == "1" ]]; then
-         append_log i "User chose 1440 config for waywall"
-      else
-         append_log e "Invalid choice for waywall config, please try again"
-         echo ""
-         echo ""
-         echo "Invalid choice for waywall config, please try again or ctrl+c to exit"
-         continue
-      fi
-      break
-   done
-   if [[ ! -d "$HOME"/.config ]]; then
-      append_log i "Creating .config directory at $HOME/.config"
-      mkdir -p "$HOME"/.config
-      mkdirSuccess=$?
-      if [[ $mkdirSuccess -ne 0 ]]; then
-         append_log e "Failed to create .config directory at $HOME/.config"
-         exit 1
-      fi
-      append_log i ".config directory created successfully at $HOME/.config"
-   fi
-
-   if [[ -d "$HOME"/.config/waywall ]]; then
-      # preemptively remove existing waywall config if present since we alread did backup above 
-      rm -rf "$HOME"/.config/waywall
-   fi
-
-   if [[ $waywallConfigChoice == "0" ]]; then
-      append_log i "Downloading 1080 config for waywall"
-      git clone https://github.com/arjuncgore/waywall_generic_config.git "$HOME"/.config/waywall
-      gitCloneSuccess=$?
-      if [[ $gitCloneSuccess -ne 0 ]]; then
-         append_log e "Failed to clone waywall_generic_config repo"
-         exit 1
-      fi
-      append_log i "waywall_generic_config repo cloned successfully at $HOME/.config/waywall"
-   elif [[ $waywallConfigChoice == "1" ]]; then
-      append_log i "Downloading 1440 config for waywall"
-      git clone -b 1440 https://github.com/arjuncgore/waywall_generic_config.git "$HOME"/.config/waywall
-      gitCloneSuccess=$?
-      if [[ $gitCloneSuccess -ne 0 ]]; then
-         append_log e "Failed to clone waywall_generic_config repo"
-         exit 1
-      fi
-      append_log i "waywall_generic_config repo cloned successfully at $HOME/.config/waywall"
-   fi
-fi
 title_print "Prism waywall configuration in progress"
 append_log i "Configuring prism to use waywall"
 read -p "Prism launcher and minecraft instance has to closed to write to config , please press any key to continue it will be automically closed if it is open:"
@@ -335,7 +252,6 @@ else
    append_log e "prism config file not found at $prismConfigFile"
    exit 1
 fi
-
 if [[ ! -d "$HOME/.java/.userPrefs/ninjabrainbot" ]]; then
    mkdir -p "$HOME/.java/.userPrefs/ninjabrainbot"
    if [[ $? -ne 0 ]]; then
@@ -365,7 +281,7 @@ else
          append_log i "Downloaded prefs.xml from $NINBOT_GREENBOAT_GODSENS_XMLURI"
          cp ./prefs.xml "$HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
          if [[ $? -ne 0 ]]; then
-            append_log e "Failed to copy downloaded prefs.xml to $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
+            append_log e "Failed to copyConfiguration downloaded prefs.xml to $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
          else
             append_log i "Copied downloaded prefs.xml to $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
          fi
@@ -373,13 +289,166 @@ else
    fi
 fi
 
+
+
+-- Bootstrap plug.waywall
+local plug_repo = "https://github.com/its-saanvi/plug.waywall"
+local waywall_share = os.getenv("XDG_DATA_HOME") or (os.getenv("HOME") .. "/.local/share") .. "/waywall"
+local plug_path = waywall_share .. "/plug"
+local file, err = io.open(plug_path .. "/.check_temp", "w")
+if not file and err then
+	if string.find(err, "No such file or directory") then
+		if not os.execute("mkdir -p " .. waywall_share) then
+			print("Failed to create waywall share directory")
+		end
+		if not os.execute("git clone " .. plug_repo .. " " .. plug_path) then
+			print("Failed to clone plug.waywall")
+		end
+	end
+else
+	file:close()
+	os.remove(plug_path .. "/.check_temp")
+end
+package.path = package.path .. ";" .. waywall_share .. "/plug/?/init.lua" .. ";" .. plug_path .. "/?.lua"
+
+local plug = require("plug")
+plug.setup({
+	dir = "plugins",
+	config = config,
+	path = "~/.local/share/waywall/plug"
+})
+EOF
+
 append_log i "finished"
 title_print "Configuration finished"
 
    
+function to_lowercase
+{
+   printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+}
+
+# 0 for yes , 1 for no
+function askUseGenericConfig {
+   local genericChoice=""
+   local confirmDenial=""
+
+   while true; do
+      read -p "Do you want to use Generic Config by Gore? [y/n]: " genericChoice
+      genericChoice=$(to_lowercase "$genericChoice")
+
+      case "$genericChoice" in
+         y|yes)
+            return 0
+            ;;
+         n|no)
+            while true; do
+               read -p "Generic config is recommended for most people. Please confirm that you DONT want to use generic config and will be configuring manually? [y/n]: " confirmDenial
+               confirmDenial=$(to_lowercase "$confirmDenial")
+
+               case "$confirmDenial" in
+                  y|yes)
+                     return 1
+                     ;;
+                  n|no)
+                     return 0
+                     ;;
+                  *)
+                     echo "Invalid choice. Please type y or n."
+                     ;;
+               esac
+            done
+            ;;
+         *)
+            echo "Invalid choice. Please type y or n."
+            ;;
+      esac
+   done
+}
 
 
+function genericConfigHandler {
+   append_log i "Backing up existing waywall config if present"
+   append_log i "Starting waywall configuration (using generic config)"
+   append_log i "Using target user: $TARGET_USER at $HOME"
+
+   if [[ -d "$HOME/.config/waywall" ]]; then
+      append_log i "Existing waywall config found, backing up to $HOME/.config/waywall.bkp"
+      count=1
+      while [[ -d "$HOME/.config/waywall.bkp$count" ]]; do
+         count=$((count + 1))
+      done
+      mv "$HOME/.config/waywall" "$HOME/.config/waywall.bkp$count"
+      append_log i "Existing waywall config backed up to $HOME/.config/waywall.bkp$count"
+   fi
+
+   sudo dnf -y install git
+   didGitInstall=$?
+   if [[ $didGitInstall -ne 0 ]]; then
+      append_log e "Failed to install git"
+      exit 1
+   fi
+   append_log i "git installed successfully"
+   local waywallConfigChoice="0"
+   while true; do
+      read -p "Do you want to use 1080p(default/0) or 1440p(1) config for waywall? [0/1]: " waywallConfigChoice
+      case "$waywallConfigChoice" in
+         0)
+            append_log i "User chose 1080 config for waywall"
+            break
+            ;;
+         1)
+            append_log i "User chose 1440 config for waywall"
+            break
+            ;;
+         *)
+            append_log e "Invalid choice for waywall config, please try again"
+            echo ""
+            echo ""
+            echo "Invalid choice for waywall config, please try again or ctrl+c to exit"
+            ;;
+      esac
+   done
+
+   if [[ ! -d "$HOME/.config" ]]; then
+      mkdir -p "$HOME/.config"
+   fi
+
+   if [[ -d "$HOME/.config/waywall" ]]; then
+      rm -rf "$HOME/.config/waywall"
+   fi
 
 
+   if [[ "$waywallConfigChoice" == "0" ]]; then
+      append_log i "Downloading 1080p config for waywall"
+      git clone https://github.com/arjuncgore/waywall_generic_config.git "$HOME/.config/waywall"
+      gitCloneSuccess=$?
+      if [[ $gitCloneSuccess -ne 0 ]]; then
+         append_log e "Failed to clone waywall_generic_config repo"
+         exit 1
+      fi
+      append_log i "waywall_generic_config repo cloned successfully at $HOME/.config/waywall"
+   elif [[ "$waywallConfigChoice" == "1" ]]; then
+      append_log i "Downloading 1440p config for waywall"
+      git clone -b 1440 https://github.com/arjuncgore/waywall_generic_config.git "$HOME/.config/waywall"
+      gitCloneSuccess=$?
+      if [[ $gitCloneSuccess -ne 0 ]]; then
+         append_log e "Failed to clone waywall_generic_config repo"
+         exit 1
+      fi
+      append_log i "waywall_generic_config repo cloned successfully at $HOME/.config/waywall"
+   fi
+}
 
 
+function waywallConfigHandler {
+   title_print "Configure Waywall config (User Input Required)"
+   append_log i "Starting waywall configuration"
+   append_log i "Using target user: $TARGET_USER at $HOME"
+
+   if askUseGenericConfig; then
+      genericConfigHandler
+   else
+      append_log i "User chose manual waywall configuration"
+   fi
+}
