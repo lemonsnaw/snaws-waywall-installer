@@ -1,5 +1,6 @@
 #!/bin/bash
 
+NINBOT_GREENBOAT_GODSENS_XMLURI="https://raw.githubusercontent.com/lemonsnaw/snaws-waywall-installer/refs/heads/main/prefs.xml"
 if [[ ! -f ./.setup.sh.log ]]; then
    echo "Creating log file"
    touch ./.setup.sh.log
@@ -43,7 +44,13 @@ fi
 
 
 function append_log {
-   echo "$1" >> ./.setup.sh.log
+   if [[ $1 == "i" ]]; then
+      echo "[INFO] $2" >> ./.setup.sh.log
+   elif [[ $1 == "e" ]]; then
+      echo "[ERROR] $2" >> ./.setup.sh.log
+   else
+      echo "[UNKNOWN] $1" >> ./.setup.sh.log
+   fi
 }
 
 function title_print {
@@ -61,7 +68,7 @@ declare -A setupChoices
 
 setupChoices[installTemurinJDKS]=true
 setupChoices[installWaywall]=true
-setupChoices[useGenericConfig]=true
+setupChoices[useGenericConfig]=false
 setupChoices[addOneShotCrosshair]=false
 setupChoices[addNinbotOpenOnF3C]=false
 # setting this true automatically sets up all parameters(greenboat, sens std deviation ) for boateye using godsens , 
@@ -84,66 +91,66 @@ title_print "Installing JDK and Prism Launcher (no user input required)"
 sudo dnf -y install adoptium-temurin-java-repository
 adoptiumRepoAdded=$?
 if [[ $adoptiumRepoAdded -ne 0 ]]; then
-   append_log "[ERROR] Failed to add adoptium repo"
+   append_log e "Failed to add adoptium repo"
    exit 1
 fi
-append_log "[INFO] Adoptium repo added successfully"
+append_log i "Adoptium repo added successfully"
 
 sudo fedora-third-party enable
 fedoraThirdPartyEnabled=$?
 if [[ $fedoraThirdPartyEnabled -ne 0 ]]; then
-   append_log "[ERROR] Failed to enable fedora-third-party"
+   append_log e "Failed to enable fedora-third-party"
    exit 1
 fi
-append_log "[INFO] fedora-third-party enabled successfully"
+append_log i "fedora-third-party enabled successfully"
 
 sudo dnf -y makecache
 dnfMakeCache=$?
 if [[ $dnfMakeCache -ne 0 ]]; then
-   append_log "[ERROR] Failed to update the dnf cache"
+   append_log e "Failed to update the dnf cache"
    exit 1
 fi
-append_log "[INFO] Cache updated successfully"
+append_log i "Cache updated successfully"
 
 sudo dnf -y install temurin-21-jdk
 jdkInstall=$?
 if [[ $jdkInstall -ne 0 ]]; then
-   append_log "[ERROR] Failed to install temurin-21-jdk"
+   append_log e "Failed to install temurin-21-jdk"
    exit 1
 fi
-append_log "[INFO] temurin-21-jdk installed successfully"
+append_log i "temurin-21-jdk installed successfully"
 JDK_VERSION_INSTALLED=21
 
 if [[ ! -d "/usr/lib/jvm/temurin-21-jdk" ]]; then
-   append_log "[ERROR] JDK not present at /usr/lib/jvm/temurin-21-jdk"
+   append_log e "JDK not present at /usr/lib/jvm/temurin-21-jdk"
    exit 1
 fi
 
-append_log "[INFO] JDK is present at /usr/lib/jvm/temurin-21-jdk"
+append_log i "JDK is present at /usr/lib/jvm/temurin-21-jdk"
 sudo alternatives --install /usr/bin/java java /usr/lib/jvm/temurin-21-jdk/bin/java 1
 sudo alternatives --set java /usr/lib/jvm/temurin-21-jdk/bin/java
 alternativesSet=$?
 if [[ $alternativesSet -ne 0 ]]; then
-   append_log "[ERROR] Failed to set alternatives for java"
+   append_log e "Failed to set alternatives for java"
    exit 1
 fi
-append_log "[INFO] Alternatives for java set successfully"
+append_log i "Alternatives for java set successfully"
 
 sudo dnf -y copr enable g3tchoo/prismlauncher
 coprEnable=$?
 if [[ $coprEnable -ne 0 ]]; then
-   append_log "[ERROR] Failed to enable copr g3tchoo/prismlauncher"
+   append_log e "Failed to enable copr g3tchoo/prismlauncher"
    exit 1
 fi
-append_log "[INFO] Copr g3tchoo/prismlauncher enabled successfully"
+append_log i "Copr g3tchoo/prismlauncher enabled successfully"
 
 sudo dnf -y install prismlauncher
 prismInstall=$?
 if [[ $prismInstall -ne 0 ]]; then
-   append_log "[ERROR] Failed to install prismlauncher"
+   append_log e "Failed to install prismlauncher"
    exit 1
 fi
-append_log "[INFO] prismlauncher installed successfully"
+append_log i "prismlauncher installed successfully"
 
 title_print "Ranked Instance Path Setup (User Input Required)"
 echo "Please launch prism launcher seperately and setup your ranked instance then at least launch the instance once"
@@ -153,157 +160,159 @@ echo "example path: /home/snaw/.local/share/PrismLauncher/instances/MCSRRanked-L
 while true; do
    read -p "Enter the path to your ranked instance:" rankedinstancepath
    if [[ -d "$rankedinstancepath" ]] && [[ -f "$rankedinstancepath/instance.cfg" ]]; then
-      append_log "[INFO] Ranked instance path is valid and instance file is present: $rankedinstancepath"
+      append_log i "Ranked instance path is valid and instance file is present: $rankedinstancepath"
       break
    fi
 
-   append_log "[ERROR] Ranked instance path is invalid: $rankedinstancepath"
+   append_log e "Ranked instance path is invalid: $rankedinstancepath"
    echo ""
    echo ""
    echo "Ranked instance path is invalid, please try again or ctrl+c to exit"
 done
 
 title_print "Waywall installation and configuration (No user input required)"
-append_log "[INFO] Starting waywall installation and configuration"
+append_log i "Starting waywall installation and configuration"
 
 isWaywallInstalled=$(dnf list installed waywall 2>/dev/null | grep -c waywall)
 if [[ $isWaywallInstalled -eq 1 ]]; then
-   append_log "[INFO] Waywall is already installed, skipping installation"
+   append_log i "Waywall is already installed, skipping installation"
 elif [[ $isWaywallInstalled -eq 0 ]]; then
-   append_log "[INFO] Waywall is not installed, proceeding with installation"
-   append_log "[INFO] Downloading waywall.rpm"
+   append_log i "Waywall is not installed, proceeding with installation"
+   append_log i "Downloading waywall.rpm"
 
    curl -L -o ./waywall.rpm https://github.com/tesselslate/waywall/releases/download/0.2026.06.13/waywall-0.5-1.fc42.x86_64.rpm
    waywallDownload=$?
    if [[ $waywallDownload -ne 0 ]]; then
-      append_log "[ERROR] Failed to download waywall.rpm"
+      append_log e "Failed to download waywall.rpm"
       exit 1
    fi
-   append_log "[INFO] waywall.rpm downloaded successfully"
+   append_log i "waywall.rpm downloaded successfully"
 
    sudo dnf -y install ./waywall.rpm
    waywallInstall=$?
    if [[ $waywallInstall -ne 0 ]]; then
-      append_log "[ERROR] Failed to install waywall.rpm"
+      append_log e "Failed to install waywall.rpm"
       exit 1
    fi
 
    title_print "Waywall verfication in progress"
-   append_log "[INFO] Verifying waywall installation"
+   append_log i "Verifying waywall installation"
    if [[ -f /usr/bin/waywall ]]; then
-      append_log "[INFO] waywall binary found at /usr/bin/waywall"
+      append_log i "waywall binary found at /usr/bin/waywall"
    else
-      append_log "[ERROR] waywall binary not found at /usr/bin/waywall"
+      append_log e "waywall binary not found at /usr/bin/waywall"
       exit 1
    fi
    if [[ -f /usr/local/lib64/waywall-glfw/libglfw.so ]]; then
-      append_log "[INFO] waywall-glfw library found at /usr/local/lib64/waywall-glfw/libglfw.so"
+      append_log i "waywall-glfw library found at /usr/local/lib64/waywall-glfw/libglfw.so"
    else
-      append_log "[ERROR] waywall-glfw library not found at /usr/local/lib64/waywall-glfw/libglfw.so"
+      append_log e "waywall-glfw library not found at /usr/local/lib64/waywall-glfw/libglfw.so"
       exit 1
    fi
-   append_log "[INFO] waywall.rpm installed successfully"
+   append_log i "waywall.rpm installed successfully"
 fi
 
 TARGET_USER="${SUDO_USER:-$(whoami)}"
 
-append_log "[INFO] Starting waywall configuration (using generic config)"
-append_log "[INFO] Using target user: $TARGET_USER at $HOME"
-append_log "[INFO] Backing up existing waywall config if present"
-if [[ -d "$HOME"/.config/waywall ]]; then
-   append_log "[INFO] Existing waywall config found, backing up to $HOME/.config/waywall.bkp"
-   count=1
-   while [[ -d "$HOME"/.config/waywall.bkp$count ]]; do
-      count=$((count + 1))
-      
-   mv "$HOME"/.config/waywall "$HOME"/.config/waywall.bkp$count
+if [[ $setupChoices[useGenericConfig] == true ]]; then
+
+   append_log i "Starting waywall configuration (using generic config)"
+   append_log i "Using target user: $TARGET_USER at $HOME"
+   append_log i "Backing up existing waywall config if present"
+   if [[ -d "$HOME"/.config/waywall ]]; then
+      append_log i "Existing waywall config found, backing up to $HOME/.config/waywall.bkp"
+      count=1
+      while [[ -d "$HOME"/.config/waywall.bkp$count ]]; do
+         count=$((count + 1))
+         
+      mv "$HOME"/.config/waywall "$HOME"/.config/waywall.bkp$count
+      done
+      append_log i "Existing waywall config backed up to $HOME/.config/waywall.bkp$count"
+   fi
+
+   sudo dnf -y install git
+   didGitInstall=$?
+   if [[ $didGitInstall -ne 0 ]]; then
+      append_log e "Failed to install git"
+      exit 1
+   fi
+   append_log i "git installed successfully"
+
+   while true; do
+      read -p "Do you want to use 1080(default/0) or 1440(1) config for waywall?(0/1): " waywallConfigChoice
+      if [[ $waywallConfigChoice == "0" ]]; then
+         append_log i "User chose 1080 config for waywall"
+      elif [[ $waywallConfigChoice == "1" ]]; then
+         append_log i "User chose 1440 config for waywall"
+      else
+         append_log e "Invalid choice for waywall config, please try again"
+         echo ""
+         echo ""
+         echo "Invalid choice for waywall config, please try again or ctrl+c to exit"
+         continue
+      fi
+      break
    done
-   append_log "[INFO] Existing waywall config backed up to $HOME/.config/waywall.bkp$count"
-fi
+   if [[ ! -d "$HOME"/.config ]]; then
+      append_log i "Creating .config directory at $HOME/.config"
+      mkdir -p "$HOME"/.config
+      mkdirSuccess=$?
+      if [[ $mkdirSuccess -ne 0 ]]; then
+         append_log e "Failed to create .config directory at $HOME/.config"
+         exit 1
+      fi
+      append_log i ".config directory created successfully at $HOME/.config"
+   fi
 
-sudo dnf -y install git
-didGitInstall=$?
-if [[ $didGitInstall -ne 0 ]]; then
-   append_log "[ERROR] Failed to install git"
-   exit 1
-fi
-append_log "[INFO] git installed successfully"
+   if [[ -d "$HOME"/.config/waywall ]]; then
+      # preemptively remove existing waywall config if present since we alread did backup above 
+      rm -rf "$HOME"/.config/waywall
+   fi
 
-while true; do
-   read -p "Do you want to use 1080(default/0) or 1440(1) config for waywall?(0/1): " waywallConfigChoice
    if [[ $waywallConfigChoice == "0" ]]; then
-      append_log "[INFO] User chose 1080 config for waywall"
+      append_log i "Downloading 1080 config for waywall"
+      git clone https://github.com/arjuncgore/waywall_generic_config.git "$HOME"/.config/waywall
+      gitCloneSuccess=$?
+      if [[ $gitCloneSuccess -ne 0 ]]; then
+         append_log e "Failed to clone waywall_generic_config repo"
+         exit 1
+      fi
+      append_log i "waywall_generic_config repo cloned successfully at $HOME/.config/waywall"
    elif [[ $waywallConfigChoice == "1" ]]; then
-      append_log "[INFO] User chose 1440 config for waywall"
-   else
-      append_log "[ERROR] Invalid choice for waywall config, please try again"
-      echo ""
-      echo ""
-      echo "Invalid choice for waywall config, please try again or ctrl+c to exit"
-      continue
+      append_log i "Downloading 1440 config for waywall"
+      git clone -b 1440 https://github.com/arjuncgore/waywall_generic_config.git "$HOME"/.config/waywall
+      gitCloneSuccess=$?
+      if [[ $gitCloneSuccess -ne 0 ]]; then
+         append_log e "Failed to clone waywall_generic_config repo"
+         exit 1
+      fi
+      append_log i "waywall_generic_config repo cloned successfully at $HOME/.config/waywall"
    fi
-   break
-done
-if [[ ! -d "$HOME"/.config ]]; then
-   append_log "[INFO] Creating .config directory at $HOME/.config"
-   mkdir -p "$HOME"/.config
-   mkdirSuccess=$?
-   if [[ $mkdirSuccess -ne 0 ]]; then
-      append_log "[ERROR] Failed to create .config directory at $HOME/.config"
-      exit 1
-   fi
-   append_log "[INFO] .config directory created successfully at $HOME/.config"
 fi
-
-if [[ -d "$HOME"/.config/waywall ]]; then
-   # preemptively remove existing waywall config if present since we alread did backup above 
-   rm -rf "$HOME"/.config/waywall
-fi
-
-if [[ $waywallConfigChoice == "0" ]]; then
-   append_log "[INFO] Downloading 1080 config for waywall"
-   git clone https://github.com/arjuncgore/waywall_generic_config.git "$HOME"/.config/waywall
-   gitCloneSuccess=$?
-   if [[ $gitCloneSuccess -ne 0 ]]; then
-      append_log "[ERROR] Failed to clone waywall_generic_config repo"
-      exit 1
-   fi
-   append_log "[INFO] waywall_generic_config repo cloned successfully at $HOME/.config/waywall"
-elif [[ $waywallConfigChoice == "1" ]]; then
-   append_log "[INFO] Downloading 1440 config for waywall"
-   git clone -b 1440 https://github.com/arjuncgore/waywall_generic_config.git "$HOME"/.config/waywall
-   gitCloneSuccess=$?
-   if [[ $gitCloneSuccess -ne 0 ]]; then
-      append_log "[ERROR] Failed to clone waywall_generic_config repo"
-      exit 1
-   fi
-   append_log "[INFO] waywall_generic_config repo cloned successfully at $HOME/.config/waywall"
-fi
-
 title_print "Prism waywall configuration in progress"
-append_log "[INFO] Configuring prism to use waywall"
+append_log i "Configuring prism to use waywall"
 read -p "Prism launcher and minecraft instance has to closed to write to config , please press any key to continue it will be automically closed if it is open:"
 
-append_log "[INFO] Closing prism launcher if it is open"
+append_log i "Closing prism launcher if it is open"
 
 prismids="$(ps -e | grep -c prismlauncher)"
 if [[ $prismids -gt 0 ]]; then
-   append_log "[INFO] Prism launcher is open, closing it"
+   append_log i "Prism launcher is open, closing it"
    # I checked that killing prism it does kill minecraft instances so I am keeping it that way
    # here minecraft instances are also killed
    pkill -f prismlauncher
    if [[ $? -ne 0 ]]; then
-      append_log "[ERROR] Failed to close prism launcher"
+      append_log e "Failed to close prism launcher"
       exit 1
    fi
-   append_log "[INFO] Prism launcher closed successfully"
+   append_log i "Prism launcher closed successfully"
 else
-   append_log "[INFO] Prism launcher is not open, proceeding with configuration"
+   append_log i "Prism launcher is not open, proceeding with configuration"
 fi
 
 prismConfigFile="$rankedinstancepath/instance.cfg"
 if [[ -f "$prismConfigFile" ]]; then
-   append_log "[INFO] prism config file found at $prismConfigFile"
+   append_log i "prism config file found at $prismConfigFile"
    awk '
       /^\[General\]/ {
          print
@@ -317,17 +326,54 @@ if [[ -f "$prismConfigFile" ]]; then
       }
       { print }
       ' "$prismConfigFile" > "./test.tmp" && mv -f "./test.tmp"  "$prismConfigFile"
-   append_log "[INFO] prism config file updated successfully at $prismConfigFile"
-   append_log "[INFO] updating permissions for prism config file at $prismConfigFile"
+   append_log i "prism config file updated successfully at $prismConfigFile"
+   append_log i "updating permissions for prism config file at $prismConfigFile"
    chown "$TARGET_USER":"$TARGET_USER" "$prismConfigFile"
    chmod a+rw "$prismConfigFile"
-   append_log "[INFO] permissions updated successfully for prism config file at $prismConfigFile"
+   append_log i "permissions updated successfully for prism config file at $prismConfigFile"
 else
-   append_log "[ERROR] prism config file not found at $prismConfigFile"
+   append_log e "prism config file not found at $prismConfigFile"
    exit 1
 fi
 
-append_log "[INFO] finished"
+if [[ ! -d "$HOME/.java/.userPrefs/ninjabrainbot" ]]; then
+   mkdir -p "$HOME/.java/.userPrefs/ninjabrainbot"
+   if [[ $? -ne 0 ]]; then
+      append_log e "Failed to create directory $HOME/.java/.userPrefs/ninjabrainbot; ninjabrainbot settings will be skipped"
+   else
+      append_log i "Created directory $HOME/.java/.userPrefs/ninjabrainbot for ninjabrainbot settings"
+   fi
+fi
+
+if [[ -f "$HOME/.java/.userPrefs/ninjabrainbot/prefs.xml" ]]; then
+   append_log i "prefs.xml already exists at $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml, skipping modifications to it"
+else
+   if [[ -f ./prefs.xml ]]; then
+      append_log i "prefs.xml found in current directory, copying to $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
+      cp ./prefs.xml "$HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
+      if [[ $? -ne 0 ]]; then
+         append_log e "Failed to copy prefs.xml to $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
+      else
+         append_log i "Copied prefs.xml to $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
+      fi
+   else
+      append_log i "prefs.xml not found in current directory, downloading from $NINBOT_GREENBOAT_GODSENS_XMLURI"
+      curl -L -o ./prefs.xml "$NINBOT_GREENBOAT_GODSENS_XMLURI"
+      if [[ $? -ne 0 ]]; then
+         append_log e "Failed to download prefs.xml from $NINBOT_GREENBOAT_GODSENS_XMLURI"
+      else
+         append_log i "Downloaded prefs.xml from $NINBOT_GREENBOAT_GODSENS_XMLURI"
+         cp ./prefs.xml "$HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
+         if [[ $? -ne 0 ]]; then
+            append_log e "Failed to copy downloaded prefs.xml to $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
+         else
+            append_log i "Copied downloaded prefs.xml to $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
+         fi
+      fi
+   fi
+fi
+
+append_log i "finished"
 title_print "Configuration finished"
 
    
