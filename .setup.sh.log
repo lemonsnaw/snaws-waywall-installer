@@ -1,0 +1,7 @@
+[INFO] Checking for existing plug waywall plugins
+[INFO] Existing plugins backed up to /home/snaw/.config/waywall/plugins.bkp3
+[INFO] checking if generic config is being used
+[INFO] Backed up extras.lua to /home/snaw/.config/waywall/extras.lua.bkp4
+[INFO] Initialized extras.lua with plug.waywall bootstrap and default template
+[INFO] Installed ww_ninbot_f3c plugin
+[INFO] Selected generic addons: showninbotf3c

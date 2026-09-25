@@ -1,29 +1,36 @@
 #!/bin/bash
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+LOG_FILE="$PWD/.setup.sh.log"
 NINBOT_GREENBOAT_GODSENS_XMLURI="https://raw.githubusercontent.com/lemonsnaw/snaws-waywall-installer/refs/heads/main/prefs.xml"
-if [[ ! -f ./.setup.sh.log ]]; then
+if [[ ! -f "$LOG_FILE" ]]; then
    echo "Creating log file"
-   touch ./.setup.sh.log
-   ls -l ./.setup.sh.log
-   if [[ ! -f ./.setup.sh.log ]]; then
+   touch "$LOG_FILE"
+   ls -l "$LOG_FILE"
+   if [[ ! -f "$LOG_FILE" ]]; then
       echo "[ERROR] Failed to create log file"
       exit 1
    fi
-elif [[ -f ./.setup.sh.log ]]; then
-   rm -f ./.setup.sh.log
-   if [[ -f ./.setup.sh.log ]]; then
+elif [[ -f "$LOG_FILE" ]]; then
+   rm -f "$LOG_FILE"
+   if [[ -f "$LOG_FILE" ]]; then
       echo "[ERROR] Failed to delete log file"
       exit 1
    fi
    echo "Creating log file"
-   touch ./.setup.sh.log
-   ls -l ./.setup.sh.log
-   if [[ ! -f ./.setup.sh.log ]]; then
+   touch "$LOG_FILE"
+   ls -l "$LOG_FILE"
+   if [[ ! -f "$LOG_FILE" ]]; then
       echo "[ERROR] Failed to create log file"
       exit 1
    fi
 fi
 
+
+
+declare -A genericAddons
+genericAddons[oneshot]='oneshot|Do you want to add oneshot crosshair to your config?|uri'
+genericAddons[showninbotf3c]='showninbotf3c|Do you want to show ninbot on F3 + C (it doesnt open by default)?|uri'
 
 # Precheck for Fedora
 architecture=$(uname -m)
@@ -45,11 +52,11 @@ fi
 
 function append_log {
    if [[ $1 == "i" ]]; then
-      echo "[INFO] $2" >> ./.setup.sh.log
+      echo "[INFO] $2" >> "$LOG_FILE"
    elif [[ $1 == "e" ]]; then
-      echo "[ERROR] $2" >> ./.setup.sh.log
+      echo "[ERROR] $2" >> "$LOG_FILE"
    else
-      echo "[UNKNOWN] $1" >> ./.setup.sh.log
+      echo "[UNKNOWN] $1" >> "$LOG_FILE"
    fi
 }
 
@@ -76,6 +83,7 @@ if [[ $fedoraVersion -lt 44 ]]; then
    exit 1
 fi
 
+function waywallPrismSetup {
 title_print "Installing JDK and Prism Launcher (no user input required)"
 
 # Fedora 44 and above
@@ -289,38 +297,9 @@ else
    fi
 fi
 
-
-
--- Bootstrap plug.waywall
-local plug_repo = "https://github.com/its-saanvi/plug.waywall"
-local waywall_share = os.getenv("XDG_DATA_HOME") or (os.getenv("HOME") .. "/.local/share") .. "/waywall"
-local plug_path = waywall_share .. "/plug"
-local file, err = io.open(plug_path .. "/.check_temp", "w")
-if not file and err then
-	if string.find(err, "No such file or directory") then
-		if not os.execute("mkdir -p " .. waywall_share) then
-			print("Failed to create waywall share directory")
-		end
-		if not os.execute("git clone " .. plug_repo .. " " .. plug_path) then
-			print("Failed to clone plug.waywall")
-		end
-	end
-else
-	file:close()
-	os.remove(plug_path .. "/.check_temp")
-end
-package.path = package.path .. ";" .. waywall_share .. "/plug/?/init.lua" .. ";" .. plug_path .. "/?.lua"
-
-local plug = require("plug")
-plug.setup({
-	dir = "plugins",
-	config = config,
-	path = "~/.local/share/waywall/plug"
-})
-EOF
-
 append_log i "finished"
 title_print "Configuration finished"
+}
 
    
 function to_lowercase
@@ -452,3 +431,241 @@ function waywallConfigHandler {
       append_log i "User chose manual waywall configuration"
    fi
 }
+
+function plugWaywallHandler {
+   title_print "Plug waywall handler"
+   echo "Checking for existing plugins"
+   append_log i "Checking for existing plug waywall plugins"
+   if [[ -d "$HOME/.config/waywall/plugins" ]]; then
+      echo "Your existing plugins will be backed up before new plugins are installed."
+      echo "You can copy them back from the backup directory after setup."
+
+      while true; do
+         read -r -p "Create a backup of the existing plugins(no new plugins will be instlaled if cancelled)? [y/n]: " confirmplugwaywall
+         case "$(to_lowercase "$confirmplugwaywall")" in
+            y|yes)
+               break
+               ;;
+            n|no)
+               append_log i "User declined existing plugin backup"
+               echo "Plugin backup cancelled; plugin installation aborted."
+               return 1
+               ;;
+            *)
+               echo "Invalid choice. Please type y or n."
+               ;;
+         esac
+      done
+
+      count=1
+      while [[ -d "$HOME/.config/waywall/plugins.bkp$count" ]]; do
+         count=$((count + 1))
+      done
+
+      local pluginsBackupPath="$HOME/.config/waywall/plugins.bkp$count"
+      if ! mv "$HOME/.config/waywall/plugins" "$pluginsBackupPath"; then
+         append_log e "Failed to back up existing plugins"
+         return 1
+      fi
+
+      append_log i "Existing plugins backed up to $pluginsBackupPath"
+      echo "Existing plugins backed up to $pluginsBackupPath"
+   fi
+
+   echo "Checking for Generic config"
+   append_log i "checking if generic config is being used"
+
+   local extrasLuaPath="$HOME/.config/waywall/extras.lua"
+   if [[ -f "$extrasLuaPath" ]]; then
+      echo "Generic config/extras.lua found at $HOME/.config/waywall"
+      count=1
+      while [[ -f "$extrasLuaPath.bkp$count" ]]; do
+         count=$((count + 1))
+      done
+
+      local extrasBackupPath="$extrasLuaPath.bkp$count"
+      if ! cp -f "$extrasLuaPath" "$extrasBackupPath"; then
+         append_log e "Failed to back up extras.lua"
+         return 1
+      fi
+
+      append_log i "Backed up extras.lua to $extrasBackupPath"
+      echo "Backed up extras.lua to $extrasBackupPath"
+   else
+      append_log i "No extras.lua found in generic config, creating default bootstrap version"
+      echo "No extras.lua found, creating a default bootstrap version in $extrasLuaPath"
+   fi
+
+   cat > "$extrasLuaPath" <<'EOF'
+-- Bootstrap plug.waywall
+local plug_repo = "https://github.com/its-saanvi/plug.waywall"
+local waywall_share = os.getenv("XDG_DATA_HOME") or (os.getenv("HOME") .. "/.local/share") .. "/waywall"
+local plug_path = waywall_share .. "/plug"
+local file, err = io.open(plug_path .. "/.check_temp", "w")
+if not file and err then
+    if string.find(err, "No such file or directory") then
+        if not os.execute("mkdir -p " .. waywall_share) then
+            print("Failed to create waywall share directory")
+        end
+        if not os.execute("git clone " .. plug_repo .. " " .. plug_path) then
+            print("Failed to clone plug.waywall")
+        end
+    end
+else
+    file:close()
+    os.remove(plug_path .. "/.check_temp")
+end
+package.path = package.path .. ";" .. waywall_share .. "/plug/?/init.lua" .. ";" .. plug_path .. "/?.lua"
+
+local plug = require("plug")
+local waywall = require("waywall")
+local helpers = require("waywall.helpers")
+
+return function(config)
+   plug.setup({
+      dir = "plugins",
+      config = config,
+      path = "~/.local/share/waywall/plug",
+      log_level = "debug",
+   })
+
+    -- Add any extra code here
+
+
+
+    -- END
+end
+EOF
+
+   append_log i "Initialized extras.lua with plug.waywall bootstrap and default template"
+   echo "extras.lua initialized with plug.waywall bootstrap and default template"
+   if ! mkdir -p $HOME/.config/waywall/plugins; then
+      append_log e "Failed to create plugins foldder"
+      echo "Failed to create waywall plugins folder"
+      return 1
+   fi
+
+   if [[ -n "${selectedGenericAddons[showninbotf3c]+set}" ]]; then
+      local ninbotPluginManifest="$SCRIPT_DIR/plugins/ww_ninbot_f3c.lua"
+      local installedPluginsPath="$HOME/.config/waywall/plugins"
+
+      if [[ ! -f "$ninbotPluginManifest" ]]; then
+         append_log e "ww_ninbot_f3c plugin manifest is missing from $SCRIPT_DIR/plugins"
+         echo "ww_ninbot_f3c plugin manifest is missing from $SCRIPT_DIR/plugins"
+         return 1
+      fi
+
+      if ! cp "$ninbotPluginManifest" "$installedPluginsPath/ww_ninbot_f3c.lua"; then
+         append_log e "Failed to install ww_ninbot_f3c plugin"
+         echo "Failed to install ww_ninbot_f3c plugin"
+         return 1
+      fi
+
+      append_log i "Installed ww_ninbot_f3c plugin"
+      echo "Installed ww_ninbot_f3c plugin"
+   fi
+
+   return 0
+}
+
+
+function genericConfigAddonsHandler {
+   title_print "Generic config Addons Setup"
+
+   declare -Ag selectedGenericAddons=()
+   local addonChoice=""
+   local addonName=""
+   local addonDescription=""
+   local addonType=""
+   local invalidAddon=""
+   local selectedAddon=""
+   local selectedIndex=""
+   local addonNumber=1
+   local -a addonNames=()
+
+   echo "Available addons:"
+   for addonName in "${!genericAddons[@]}"; do      addonNames[$addonNumber]="$addonName"
+      IFS='|' read -r _ addonDescription addonType <<< "${genericAddons[$addonName]}"
+      printf '  %-18s %s\n' "$addonNumber" "$addonDescription"
+      addonNumber=$((addonNumber + 1))
+   done
+
+   while true; do
+      read -r -p "Enter addon numbers separated by spaces or * for all: " addonChoice
+      addonChoice=${addonChoice//,/ }
+      selectedGenericAddons=()
+
+      if [[ "$addonChoice" == "*" ]]; then
+         for addonName in "${!genericAddons[@]}"; do
+            selectedGenericAddons["$addonName"]=1
+         done
+         break
+      fi
+
+      invalidAddon=""
+      for selectedAddon in $addonChoice; do
+         if [[ "$selectedAddon" =~ ^[0-9]+$ ]] && (( selectedAddon > 0 && selectedAddon < addonNumber )); then
+            selectedIndex="${addonNames[$selectedAddon]}"
+            selectedGenericAddons["$selectedIndex"]=1
+         else
+            invalidAddon="$selectedAddon"
+            break
+         fi
+      done
+
+      if [[ -n "$invalidAddon" ]]; then
+         selectedGenericAddons=()
+         echo "Unknown addon number: $invalidAddon"
+         echo "Choose a number from 1 to $((addonNumber - 1)), or * for all."
+         continue
+      fi
+
+      if [[ ${#selectedGenericAddons[@]} -eq 0 ]]; then
+         echo "Please select at least one addon."
+         continue
+      fi
+
+      break
+   done
+
+   if ! plugWaywallHandler; then
+      echo "User declined plugin backup; addon setup cannot continue."
+      return 1
+   fi
+
+   append_log i "Selected generic addons: ${!selectedGenericAddons[*]}"
+   echo "Selected addons: ${!selectedGenericAddons[*]}"
+}
+
+function mainMenu {
+   local menuChoice=""
+
+   while true; do
+      title_print "Snaws Waywall Setup"
+      echo "1) Waywall and Prism setup"
+      echo "2) Generic config addons using plug.waywall"
+      echo "q) Quit"
+      read -r -p "Choose an option: " menuChoice
+
+      case "$(to_lowercase "$menuChoice")" in
+         1)
+            waywallPrismSetup || return 1
+            waywallConfigHandler || return 1
+            return 0
+            ;;
+         2)
+            genericConfigAddonsHandler || return 1
+            return 0
+            ;;
+         q|quit)
+            echo "Exiting."
+            return 0
+            ;;
+         *)
+            echo "Invalid choice. Please choose 1, 2, or q."
+            ;;
+      esac
+   done
+}
+
+mainMenu
