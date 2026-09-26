@@ -9,8 +9,7 @@ This is script designed for Fedora 44 + which does following:
 - Configures your minecraft instance to use waywall ( wrapper and glfw setup)
 
 # How to use 
-1. Download the `setup.sh` script.
-2. Open a terminal and change the directory wherever the setup.sh is present. i.e if it's in downloads then `cd path`, example `cd ~/Downloads/`.
+1. Download the `setup.zip` from releases and extract it and open terminal in the same folder.
 3. Run following command to mark it as executable `chmod +x setup.sh`.
 4. Run the script `./setup.sh` in terminal and follow onscreen instructions
 
