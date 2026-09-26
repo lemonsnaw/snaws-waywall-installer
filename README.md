@@ -20,7 +20,14 @@ The main menu provides two paths:
 2. Generic config addons using plug.waywall
 
 # Current development plans:
-- Oneshot crosshair setup in config
 - structure probably and port for debian based distros and fedora 43 and below support
 
 
+# Thanks!
+- [woofdoggo](https://github.com/tesselslate) for waywall,resetti and MCSR on linux possible.
+- [its-saanvi](https://github.com/its-saanvi/linux-mcsr) for linux MCSR guide and plug.waywall
+- [arjuncgore](https://github.com/arjuncgore) for Gores generic config and references for scripts for plug waywall
+- [qMaxXen](https://github.com/qMaxXen) for nbtracker and a lot help with resetti when I started out.
+- [vojta](https://github.com/votisek) review on script as well as general advice and prism config writing.
+
+and many more people in [linux mcsr cord](https://discord.com/invite/3tm4UpUQ8t) who helped and adviced along the way

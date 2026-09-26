@@ -1,7 +1,14 @@
-[INFO] Checking for existing plug waywall plugins
-[INFO] Existing plugins backed up to /home/snaw/.config/waywall/plugins.bkp3
-[INFO] checking if generic config is being used
-[INFO] Backed up extras.lua to /home/snaw/.config/waywall/extras.lua.bkp4
-[INFO] Initialized extras.lua with plug.waywall bootstrap and default template
-[INFO] Installed ww_ninbot_f3c plugin
-[INFO] Selected generic addons: showninbotf3c
+[INFO] adoptium-temurin-java-repository is already installed
+[INFO] Adoptium repo added successfully
+[INFO] fedora-third-party enabled successfully
+[INFO] Cache updated successfully
+[INFO] temurin-21-jdk is already installed
+[INFO] temurin-21-jdk installed successfully
+[INFO] JDK is present at /usr/lib/jvm/temurin-21-jdk
+[INFO] Alternatives for java set successfully
+[INFO] Copr g3tchoo/prismlauncher enabled successfully
+[INFO] prismlauncher is already installed
+[INFO] prismlauncher installed successfully
+[INFO] Opening Prism Launcher to import MCSR Ranked modpack
+[INFO] Started Prism Launcher for MCSR Ranked import (PID 125827)
+[ERROR] Ranked instance path is invalid: 

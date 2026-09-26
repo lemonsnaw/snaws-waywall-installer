@@ -73,9 +73,6 @@ trap sigIntHandler SIGINT
 
 
 
-# set to used with URI parameter when launching through cmd for prism but it still requires usr input instead of auto downloading 
-# so probably not going 
-#to use it unless I find some alternative
 MCSR_RANKED_PACK_URL="https://redlime.github.io/MCSRMods/modpacks/v4/MCSRRanked-Linux-1.16.1-Basic-w-SS.mrpack"
 
 if [[ $fedoraVersion -lt 44 ]]; then
@@ -87,6 +84,9 @@ function waywallPrismSetup {
 title_print "Installing JDK and Prism Launcher (no user input required)"
 
 # Fedora 44 and above
+if rpm -q --quiet adoptium-temurin-java-repository; then
+   append_log i "adoptium-temurin-java-repository is already installed"
+fi
 sudo dnf -y install adoptium-temurin-java-repository
 adoptiumRepoAdded=$?
 if [[ $adoptiumRepoAdded -ne 0 ]]; then
@@ -111,6 +111,9 @@ if [[ $dnfMakeCache -ne 0 ]]; then
 fi
 append_log i "Cache updated successfully"
 
+if rpm -q --quiet temurin-21-jdk; then
+   append_log i "temurin-21-jdk is already installed"
+fi
 sudo dnf -y install temurin-21-jdk
 jdkInstall=$?
 if [[ $jdkInstall -ne 0 ]]; then
@@ -143,6 +146,9 @@ if [[ $coprEnable -ne 0 ]]; then
 fi
 append_log i "Copr g3tchoo/prismlauncher enabled successfully"
 
+if rpm -q --quiet prismlauncher; then
+   append_log i "prismlauncher is already installed"
+fi
 sudo dnf -y install prismlauncher
 prismInstall=$?
 if [[ $prismInstall -ne 0 ]]; then
@@ -151,13 +157,20 @@ if [[ $prismInstall -ne 0 ]]; then
 fi
 append_log i "prismlauncher installed successfully"
 
+title_print "Import MCSR Ranked Instance"
+read -r -n 1 -s -p "Script will open the MCSR Ranked pack in Prism Launcher, accept and press ok and launch the instance. Press any key to continue..."
+echo
+append_log i "Opening Prism Launcher to import MCSR Ranked modpack"
+prismlauncher --import "$MCSR_RANKED_PACK_URL" >/dev/null 2>&1 &
+prismImportPid=$!
+append_log i "Started Prism Launcher for MCSR Ranked import (PID $prismImportPid)"
+echo "Prism Launcher started in the background (PID $prismImportPid)."
+
 title_print "Ranked Instance Path Setup (User Input Required)"
-echo "Please launch prism launcher seperately and setup your ranked instance then at least launch the instance once"
-echo "then copy the instance path and paste it here and press enter"
-echo "If you have already done this, please enter the path to your ranked instance and press enter"
+echo "Complete the import and launch the instance once, then enter its path below."
 echo "example path: /home/snaw/.local/share/PrismLauncher/instances/MCSRRanked-Linux-1.16.1-Basic-w-SS"
 while true; do
-   read -p "Enter the path to your ranked instance:" rankedinstancepath
+   read -p "Enter path:" rankedinstancepath
    if [[ -d "$rankedinstancepath" ]] && [[ -f "$rankedinstancepath/instance.cfg" ]]; then
       append_log i "Ranked instance path is valid and instance file is present: $rankedinstancepath"
       break
@@ -361,6 +374,9 @@ function genericConfigHandler {
       append_log i "Existing waywall config backed up to $HOME/.config/waywall.bkp$count"
    fi
 
+   if rpm -q --quiet git; then
+      append_log i "git is already installed"
+   fi
    sudo dnf -y install git
    didGitInstall=$?
    if [[ $didGitInstall -ne 0 ]]; then
@@ -545,17 +561,18 @@ EOF
       return 1
    fi
 
-   if [[ -n "${selectedGenericAddons[showninbotf3c]+set}" ]]; then
-      local ninbotPluginManifest="$SCRIPT_DIR/plugins/ww_ninbot_f3c.lua"
-      local installedPluginsPath="$HOME/.config/waywall/plugins"
+   local ninbotPlugin="$SCRIPT_DIR/plugins/ww_ninbot_f3c.lua"
+   local oneShotPlugin="$SCRIPT_DIR/plugins/ww_oneshot_crosshair.lua"
+   local installedPluginsPath="$HOME/.config/waywall/plugins"
 
-      if [[ ! -f "$ninbotPluginManifest" ]]; then
-         append_log e "ww_ninbot_f3c plugin manifest is missing from $SCRIPT_DIR/plugins"
-         echo "ww_ninbot_f3c plugin manifest is missing from $SCRIPT_DIR/plugins"
+   if [[ -n "${selectedGenericAddons[showninbotf3c]+set}" ]]; then
+      if [[ ! -f "$ninbotPlugin" ]]; then
+         append_log e "ww_ninbot_f3c plugin is missing from $SCRIPT_DIR/plugins"
+         echo "ww_ninbot_f3c plugin is missing from $SCRIPT_DIR/plugins"
          return 1
       fi
 
-      if ! cp "$ninbotPluginManifest" "$installedPluginsPath/ww_ninbot_f3c.lua"; then
+      if ! cp "$ninbotPlugin" "$installedPluginsPath/ww_ninbot_f3c.lua"; then
          append_log e "Failed to install ww_ninbot_f3c plugin"
          echo "Failed to install ww_ninbot_f3c plugin"
          return 1
@@ -563,6 +580,23 @@ EOF
 
       append_log i "Installed ww_ninbot_f3c plugin"
       echo "Installed ww_ninbot_f3c plugin"
+   fi
+
+   if [[ -n "${selectedGenericAddons[oneshot]+set}" ]]; then
+      if [[ ! -f "$oneShotPlugin" ]]; then
+         append_log e "ww_oneshot_crosshair plugin is missing from $SCRIPT_DIR/plugins"
+         echo "ww_oneshot_crosshair plugin is missing from $SCRIPT_DIR/plugins"
+         return 1
+      fi
+
+      if ! cp "$oneShotPlugin" "$installedPluginsPath/ww_oneshot_crosshair.lua"; then
+         append_log e "Failed to install ww_oneshot_crosshair plugin"
+         echo "Failed to install ww_oneshot_crosshair plugin"
+         return 1
+      fi
+
+      append_log i "Installed ww_oneshot_crosshair plugin"
+      echo "Installed ww_oneshot_crosshair plugin"
    fi
 
    return 0
@@ -635,6 +669,7 @@ function genericConfigAddonsHandler {
 
    append_log i "Selected generic addons: ${!selectedGenericAddons[*]}"
    echo "Selected addons: ${!selectedGenericAddons[*]}"
+   title_print "Plugin Addons Setup Complete"
 }
 
 function mainMenu {
@@ -651,6 +686,7 @@ function mainMenu {
          1)
             waywallPrismSetup || return 1
             waywallConfigHandler || return 1
+            title_print "Waywall and Prism Setup Complete"
             return 0
             ;;
          2)
