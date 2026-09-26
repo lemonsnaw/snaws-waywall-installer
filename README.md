@@ -1,6 +1,6 @@
 # Snaws waywall install script
 
-This is fast script designed for Fedora 44 + which does following:
+This is script designed for Fedora 44 + which does following:
 
 - Download and setup default JDK for Fedora to avoid issue related to headless JDK
 - Download and install Prism launcher
@@ -14,11 +14,20 @@ This is fast script designed for Fedora 44 + which does following:
 3. Run following command to mark it as executable `chmod +x setup.sh`.
 4. Run the script `./setup.sh` in terminal and follow onscreen instructions
 
+The main menu provides two paths:
+
+1. Waywall and Prism setup
+2. Generic config addons using plug.waywall
+
 # Current development plans:
-- Menu for options (currently it just installs stuff and sets up waywall)
-- Ninbot config auto setup for boateye
-- Ninbot shows on F3+C
-- Oneshot crosshair setup in config
 - structure probably and port for debian based distros and fedora 43 and below support
 
 
+# Thanks!
+- [woofdoggo](https://github.com/tesselslate) for waywall,resetti and MCSR on linux possible.
+- [its-saanvi](https://github.com/its-saanvi/linux-mcsr) for linux MCSR guide and plug.waywall
+- [arjuncgore](https://github.com/arjuncgore) for Gores generic config and references for scripts for plug waywall
+- [qMaxXen](https://github.com/qMaxXen) for nbtracker and a lot help with resetti when I started out.
+- [vojta](https://github.com/votisek) review on script as well as general advice and prism config writing.
+
+and many more people in [linux mcsr cord](https://discord.com/invite/3tm4UpUQ8t) who helped and adviced along the way

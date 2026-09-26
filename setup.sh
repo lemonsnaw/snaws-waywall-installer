@@ -1,29 +1,36 @@
 #!/bin/bash
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+LOG_FILE="$PWD/.setup.sh.log"
 NINBOT_GREENBOAT_GODSENS_XMLURI="https://raw.githubusercontent.com/lemonsnaw/snaws-waywall-installer/refs/heads/main/prefs.xml"
-if [[ ! -f ./.setup.sh.log ]]; then
+if [[ ! -f "$LOG_FILE" ]]; then
    echo "Creating log file"
-   touch ./.setup.sh.log
-   ls -l ./.setup.sh.log
-   if [[ ! -f ./.setup.sh.log ]]; then
+   touch "$LOG_FILE"
+   ls -l "$LOG_FILE"
+   if [[ ! -f "$LOG_FILE" ]]; then
       echo "[ERROR] Failed to create log file"
       exit 1
    fi
-elif [[ -f ./.setup.sh.log ]]; then
-   rm -f ./.setup.sh.log
-   if [[ -f ./.setup.sh.log ]]; then
+elif [[ -f "$LOG_FILE" ]]; then
+   rm -f "$LOG_FILE"
+   if [[ -f "$LOG_FILE" ]]; then
       echo "[ERROR] Failed to delete log file"
       exit 1
    fi
    echo "Creating log file"
-   touch ./.setup.sh.log
-   ls -l ./.setup.sh.log
-   if [[ ! -f ./.setup.sh.log ]]; then
+   touch "$LOG_FILE"
+   ls -l "$LOG_FILE"
+   if [[ ! -f "$LOG_FILE" ]]; then
       echo "[ERROR] Failed to create log file"
       exit 1
    fi
 fi
 
+
+
+declare -A genericAddons
+genericAddons[oneshot]='oneshot|Do you want to add oneshot crosshair to your config?|uri'
+genericAddons[showninbotf3c]='showninbotf3c|Do you want to show ninbot on F3 + C (it doesnt open by default)?|uri'
 
 # Precheck for Fedora
 architecture=$(uname -m)
@@ -45,11 +52,11 @@ fi
 
 function append_log {
    if [[ $1 == "i" ]]; then
-      echo "[INFO] $2" >> ./.setup.sh.log
+      echo "[INFO] $2" >> "$LOG_FILE"
    elif [[ $1 == "e" ]]; then
-      echo "[ERROR] $2" >> ./.setup.sh.log
+      echo "[ERROR] $2" >> "$LOG_FILE"
    else
-      echo "[UNKNOWN] $1" >> ./.setup.sh.log
+      echo "[UNKNOWN] $1" >> "$LOG_FILE"
    fi
 }
 
@@ -64,20 +71,8 @@ function sigIntHandler {
 }
 trap sigIntHandler SIGINT
 
-declare -A setupChoices
 
-setupChoices[installTemurinJDKS]=true
-setupChoices[installWaywall]=true
-setupChoices[useGenericConfig]=false
-setupChoices[addOneShotCrosshair]=false
-setupChoices[addNinbotOpenOnF3C]=false
-# setting this true automatically sets up all parameters(greenboat, sens std deviation ) for boateye using godsens , 
-# you still have to setup waywall sens using calculator provided in guide
-setupChoices[ninbotboateyepresetup]=true
 
-# set to used with URI parameter when launching through cmd for prism but it still requires usr input instead of auto downloading 
-# so probably not going 
-#to use it unless I find some alternative
 MCSR_RANKED_PACK_URL="https://redlime.github.io/MCSRMods/modpacks/v4/MCSRRanked-Linux-1.16.1-Basic-w-SS.mrpack"
 
 if [[ $fedoraVersion -lt 44 ]]; then
@@ -85,9 +80,13 @@ if [[ $fedoraVersion -lt 44 ]]; then
    exit 1
 fi
 
+function waywallPrismSetup {
 title_print "Installing JDK and Prism Launcher (no user input required)"
 
 # Fedora 44 and above
+if rpm -q --quiet adoptium-temurin-java-repository; then
+   append_log i "adoptium-temurin-java-repository is already installed"
+fi
 sudo dnf -y install adoptium-temurin-java-repository
 adoptiumRepoAdded=$?
 if [[ $adoptiumRepoAdded -ne 0 ]]; then
@@ -112,6 +111,9 @@ if [[ $dnfMakeCache -ne 0 ]]; then
 fi
 append_log i "Cache updated successfully"
 
+if rpm -q --quiet temurin-21-jdk; then
+   append_log i "temurin-21-jdk is already installed"
+fi
 sudo dnf -y install temurin-21-jdk
 jdkInstall=$?
 if [[ $jdkInstall -ne 0 ]]; then
@@ -144,6 +146,9 @@ if [[ $coprEnable -ne 0 ]]; then
 fi
 append_log i "Copr g3tchoo/prismlauncher enabled successfully"
 
+if rpm -q --quiet prismlauncher; then
+   append_log i "prismlauncher is already installed"
+fi
 sudo dnf -y install prismlauncher
 prismInstall=$?
 if [[ $prismInstall -ne 0 ]]; then
@@ -152,13 +157,20 @@ if [[ $prismInstall -ne 0 ]]; then
 fi
 append_log i "prismlauncher installed successfully"
 
+title_print "Import MCSR Ranked Instance"
+read -r -n 1 -s -p "Script will open the MCSR Ranked pack in Prism Launcher, accept and press ok and launch the instance. Press any key to continue..."
+echo
+append_log i "Opening Prism Launcher to import MCSR Ranked modpack"
+prismlauncher --import "$MCSR_RANKED_PACK_URL" >/dev/null 2>&1 &
+prismImportPid=$!
+append_log i "Started Prism Launcher for MCSR Ranked import (PID $prismImportPid)"
+echo "Prism Launcher started in the background (PID $prismImportPid)."
+
 title_print "Ranked Instance Path Setup (User Input Required)"
-echo "Please launch prism launcher seperately and setup your ranked instance then at least launch the instance once"
-echo "then copy the instance path and paste it here and press enter"
-echo "If you have already done this, please enter the path to your ranked instance and press enter"
+echo "Complete the import and launch the instance once, then enter its path below."
 echo "example path: /home/snaw/.local/share/PrismLauncher/instances/MCSRRanked-Linux-1.16.1-Basic-w-SS"
 while true; do
-   read -p "Enter the path to your ranked instance:" rankedinstancepath
+   read -p "Enter path:" rankedinstancepath
    if [[ -d "$rankedinstancepath" ]] && [[ -f "$rankedinstancepath/instance.cfg" ]]; then
       append_log i "Ranked instance path is valid and instance file is present: $rankedinstancepath"
       break
@@ -214,81 +226,7 @@ fi
 
 TARGET_USER="${SUDO_USER:-$(whoami)}"
 
-if [[ $setupChoices[useGenericConfig] == true ]]; then
 
-   append_log i "Starting waywall configuration (using generic config)"
-   append_log i "Using target user: $TARGET_USER at $HOME"
-   append_log i "Backing up existing waywall config if present"
-   if [[ -d "$HOME"/.config/waywall ]]; then
-      append_log i "Existing waywall config found, backing up to $HOME/.config/waywall.bkp"
-      count=1
-      while [[ -d "$HOME"/.config/waywall.bkp$count ]]; do
-         count=$((count + 1))
-         
-      mv "$HOME"/.config/waywall "$HOME"/.config/waywall.bkp$count
-      done
-      append_log i "Existing waywall config backed up to $HOME/.config/waywall.bkp$count"
-   fi
-
-   sudo dnf -y install git
-   didGitInstall=$?
-   if [[ $didGitInstall -ne 0 ]]; then
-      append_log e "Failed to install git"
-      exit 1
-   fi
-   append_log i "git installed successfully"
-
-   while true; do
-      read -p "Do you want to use 1080(default/0) or 1440(1) config for waywall?(0/1): " waywallConfigChoice
-      if [[ $waywallConfigChoice == "0" ]]; then
-         append_log i "User chose 1080 config for waywall"
-      elif [[ $waywallConfigChoice == "1" ]]; then
-         append_log i "User chose 1440 config for waywall"
-      else
-         append_log e "Invalid choice for waywall config, please try again"
-         echo ""
-         echo ""
-         echo "Invalid choice for waywall config, please try again or ctrl+c to exit"
-         continue
-      fi
-      break
-   done
-   if [[ ! -d "$HOME"/.config ]]; then
-      append_log i "Creating .config directory at $HOME/.config"
-      mkdir -p "$HOME"/.config
-      mkdirSuccess=$?
-      if [[ $mkdirSuccess -ne 0 ]]; then
-         append_log e "Failed to create .config directory at $HOME/.config"
-         exit 1
-      fi
-      append_log i ".config directory created successfully at $HOME/.config"
-   fi
-
-   if [[ -d "$HOME"/.config/waywall ]]; then
-      # preemptively remove existing waywall config if present since we alread did backup above 
-      rm -rf "$HOME"/.config/waywall
-   fi
-
-   if [[ $waywallConfigChoice == "0" ]]; then
-      append_log i "Downloading 1080 config for waywall"
-      git clone https://github.com/arjuncgore/waywall_generic_config.git "$HOME"/.config/waywall
-      gitCloneSuccess=$?
-      if [[ $gitCloneSuccess -ne 0 ]]; then
-         append_log e "Failed to clone waywall_generic_config repo"
-         exit 1
-      fi
-      append_log i "waywall_generic_config repo cloned successfully at $HOME/.config/waywall"
-   elif [[ $waywallConfigChoice == "1" ]]; then
-      append_log i "Downloading 1440 config for waywall"
-      git clone -b 1440 https://github.com/arjuncgore/waywall_generic_config.git "$HOME"/.config/waywall
-      gitCloneSuccess=$?
-      if [[ $gitCloneSuccess -ne 0 ]]; then
-         append_log e "Failed to clone waywall_generic_config repo"
-         exit 1
-      fi
-      append_log i "waywall_generic_config repo cloned successfully at $HOME/.config/waywall"
-   fi
-fi
 title_print "Prism waywall configuration in progress"
 append_log i "Configuring prism to use waywall"
 read -p "Prism launcher and minecraft instance has to closed to write to config , please press any key to continue it will be automically closed if it is open:"
@@ -335,7 +273,6 @@ else
    append_log e "prism config file not found at $prismConfigFile"
    exit 1
 fi
-
 if [[ ! -d "$HOME/.java/.userPrefs/ninjabrainbot" ]]; then
    mkdir -p "$HOME/.java/.userPrefs/ninjabrainbot"
    if [[ $? -ne 0 ]]; then
@@ -365,7 +302,7 @@ else
          append_log i "Downloaded prefs.xml from $NINBOT_GREENBOAT_GODSENS_XMLURI"
          cp ./prefs.xml "$HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
          if [[ $? -ne 0 ]]; then
-            append_log e "Failed to copy downloaded prefs.xml to $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
+            append_log e "Failed to copyConfiguration downloaded prefs.xml to $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
          else
             append_log i "Copied downloaded prefs.xml to $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
          fi
@@ -375,11 +312,396 @@ fi
 
 append_log i "finished"
 title_print "Configuration finished"
+}
 
    
+function to_lowercase
+{
+   printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+}
+
+# 0 for yes , 1 for no
+function askUseGenericConfig {
+   local genericChoice=""
+   local confirmDenial=""
+
+   while true; do
+      read -p "Do you want to use Generic Config by Gore? [y/n]: " genericChoice
+      genericChoice=$(to_lowercase "$genericChoice")
+
+      case "$genericChoice" in
+         y|yes)
+            return 0
+            ;;
+         n|no)
+            while true; do
+               read -p "Generic config is recommended for most people. Please confirm that you DONT want to use generic config and will be configuring manually? [y/n]: " confirmDenial
+               confirmDenial=$(to_lowercase "$confirmDenial")
+
+               case "$confirmDenial" in
+                  y|yes)
+                     return 1
+                     ;;
+                  n|no)
+                     return 0
+                     ;;
+                  *)
+                     echo "Invalid choice. Please type y or n."
+                     ;;
+               esac
+            done
+            ;;
+         *)
+            echo "Invalid choice. Please type y or n."
+            ;;
+      esac
+   done
+}
+
+
+function genericConfigHandler {
+   append_log i "Backing up existing waywall config if present"
+   append_log i "Starting waywall configuration (using generic config)"
+   append_log i "Using target user: $TARGET_USER at $HOME"
+
+   if [[ -d "$HOME/.config/waywall" ]]; then
+      append_log i "Existing waywall config found, backing up to $HOME/.config/waywall.bkp"
+      count=1
+      while [[ -d "$HOME/.config/waywall.bkp$count" ]]; do
+         count=$((count + 1))
+      done
+      mv "$HOME/.config/waywall" "$HOME/.config/waywall.bkp$count"
+      append_log i "Existing waywall config backed up to $HOME/.config/waywall.bkp$count"
+   fi
+
+   if rpm -q --quiet git; then
+      append_log i "git is already installed"
+   fi
+   sudo dnf -y install git
+   didGitInstall=$?
+   if [[ $didGitInstall -ne 0 ]]; then
+      append_log e "Failed to install git"
+      exit 1
+   fi
+   append_log i "git installed successfully"
+   local waywallConfigChoice="0"
+   while true; do
+      read -p "Do you want to use 1080p(default/0) or 1440p(1) config for waywall? [0/1]: " waywallConfigChoice
+      case "$waywallConfigChoice" in
+         0)
+            append_log i "User chose 1080 config for waywall"
+            break
+            ;;
+         1)
+            append_log i "User chose 1440 config for waywall"
+            break
+            ;;
+         *)
+            append_log e "Invalid choice for waywall config, please try again"
+            echo ""
+            echo ""
+            echo "Invalid choice for waywall config, please try again or ctrl+c to exit"
+            ;;
+      esac
+   done
+
+   if [[ ! -d "$HOME/.config" ]]; then
+      mkdir -p "$HOME/.config"
+   fi
+
+   if [[ -d "$HOME/.config/waywall" ]]; then
+      rm -rf "$HOME/.config/waywall"
+   fi
+
+
+   if [[ "$waywallConfigChoice" == "0" ]]; then
+      append_log i "Downloading 1080p config for waywall"
+      git clone https://github.com/arjuncgore/waywall_generic_config.git "$HOME/.config/waywall"
+      gitCloneSuccess=$?
+      if [[ $gitCloneSuccess -ne 0 ]]; then
+         append_log e "Failed to clone waywall_generic_config repo"
+         exit 1
+      fi
+      append_log i "waywall_generic_config repo cloned successfully at $HOME/.config/waywall"
+   elif [[ "$waywallConfigChoice" == "1" ]]; then
+      append_log i "Downloading 1440p config for waywall"
+      git clone -b 1440 https://github.com/arjuncgore/waywall_generic_config.git "$HOME/.config/waywall"
+      gitCloneSuccess=$?
+      if [[ $gitCloneSuccess -ne 0 ]]; then
+         append_log e "Failed to clone waywall_generic_config repo"
+         exit 1
+      fi
+      append_log i "waywall_generic_config repo cloned successfully at $HOME/.config/waywall"
+   fi
+}
+
+
+function waywallConfigHandler {
+   title_print "Configure Waywall config (User Input Required)"
+   append_log i "Starting waywall configuration"
+   append_log i "Using target user: $TARGET_USER at $HOME"
+
+   if askUseGenericConfig; then
+      genericConfigHandler
+   else
+      append_log i "User chose manual waywall configuration"
+   fi
+}
+
+function plugWaywallHandler {
+   title_print "Plug waywall handler"
+   echo "Checking for existing plugins"
+   append_log i "Checking for existing plug waywall plugins"
+   if [[ -d "$HOME/.config/waywall/plugins" ]]; then
+      echo "Your existing plugins will be backed up before new plugins are installed."
+      echo "You can copy them back from the backup directory after setup."
+
+      while true; do
+         read -r -p "Create a backup of the existing plugins(no new plugins will be instlaled if cancelled)? [y/n]: " confirmplugwaywall
+         case "$(to_lowercase "$confirmplugwaywall")" in
+            y|yes)
+               break
+               ;;
+            n|no)
+               append_log i "User declined existing plugin backup"
+               echo "Plugin backup cancelled; plugin installation aborted."
+               return 1
+               ;;
+            *)
+               echo "Invalid choice. Please type y or n."
+               ;;
+         esac
+      done
+
+      count=1
+      while [[ -d "$HOME/.config/waywall/plugins.bkp$count" ]]; do
+         count=$((count + 1))
+      done
+
+      local pluginsBackupPath="$HOME/.config/waywall/plugins.bkp$count"
+      if ! mv "$HOME/.config/waywall/plugins" "$pluginsBackupPath"; then
+         append_log e "Failed to back up existing plugins"
+         return 1
+      fi
+
+      append_log i "Existing plugins backed up to $pluginsBackupPath"
+      echo "Existing plugins backed up to $pluginsBackupPath"
+   fi
+
+   echo "Checking for Generic config"
+   append_log i "checking if generic config is being used"
+
+   local extrasLuaPath="$HOME/.config/waywall/extras.lua"
+   if [[ -f "$extrasLuaPath" ]]; then
+      echo "Generic config/extras.lua found at $HOME/.config/waywall"
+      count=1
+      while [[ -f "$extrasLuaPath.bkp$count" ]]; do
+         count=$((count + 1))
+      done
+
+      local extrasBackupPath="$extrasLuaPath.bkp$count"
+      if ! cp -f "$extrasLuaPath" "$extrasBackupPath"; then
+         append_log e "Failed to back up extras.lua"
+         return 1
+      fi
+
+      append_log i "Backed up extras.lua to $extrasBackupPath"
+      echo "Backed up extras.lua to $extrasBackupPath"
+   else
+      append_log i "No extras.lua found in generic config, creating default bootstrap version"
+      echo "No extras.lua found, creating a default bootstrap version in $extrasLuaPath"
+   fi
+
+   cat > "$extrasLuaPath" <<'EOF'
+-- Bootstrap plug.waywall
+local plug_repo = "https://github.com/its-saanvi/plug.waywall"
+local waywall_share = os.getenv("XDG_DATA_HOME") or (os.getenv("HOME") .. "/.local/share") .. "/waywall"
+local plug_path = waywall_share .. "/plug"
+local file, err = io.open(plug_path .. "/.check_temp", "w")
+if not file and err then
+    if string.find(err, "No such file or directory") then
+        if not os.execute("mkdir -p " .. waywall_share) then
+            print("Failed to create waywall share directory")
+        end
+        if not os.execute("git clone " .. plug_repo .. " " .. plug_path) then
+            print("Failed to clone plug.waywall")
+        end
+    end
+else
+    file:close()
+    os.remove(plug_path .. "/.check_temp")
+end
+package.path = package.path .. ";" .. waywall_share .. "/plug/?/init.lua" .. ";" .. plug_path .. "/?.lua"
+
+local plug = require("plug")
+local waywall = require("waywall")
+local helpers = require("waywall.helpers")
+
+return function(config)
+   plug.setup({
+      dir = "plugins",
+      config = config,
+      path = "~/.local/share/waywall/plug",
+      log_level = "debug",
+   })
+
+    -- Add any extra code here
 
 
 
+    -- END
+end
+EOF
+
+   append_log i "Initialized extras.lua with plug.waywall bootstrap and default template"
+   echo "extras.lua initialized with plug.waywall bootstrap and default template"
+   if ! mkdir -p $HOME/.config/waywall/plugins; then
+      append_log e "Failed to create plugins foldder"
+      echo "Failed to create waywall plugins folder"
+      return 1
+   fi
+
+   local ninbotPlugin="$SCRIPT_DIR/plugins/ww_ninbot_f3c.lua"
+   local oneShotPlugin="$SCRIPT_DIR/plugins/ww_oneshot_crosshair.lua"
+   local installedPluginsPath="$HOME/.config/waywall/plugins"
+
+   if [[ -n "${selectedGenericAddons[showninbotf3c]+set}" ]]; then
+      if [[ ! -f "$ninbotPlugin" ]]; then
+         append_log e "ww_ninbot_f3c plugin is missing from $SCRIPT_DIR/plugins"
+         echo "ww_ninbot_f3c plugin is missing from $SCRIPT_DIR/plugins"
+         return 1
+      fi
+
+      if ! cp "$ninbotPlugin" "$installedPluginsPath/ww_ninbot_f3c.lua"; then
+         append_log e "Failed to install ww_ninbot_f3c plugin"
+         echo "Failed to install ww_ninbot_f3c plugin"
+         return 1
+      fi
+
+      append_log i "Installed ww_ninbot_f3c plugin"
+      echo "Installed ww_ninbot_f3c plugin"
+   fi
+
+   if [[ -n "${selectedGenericAddons[oneshot]+set}" ]]; then
+      if [[ ! -f "$oneShotPlugin" ]]; then
+         append_log e "ww_oneshot_crosshair plugin is missing from $SCRIPT_DIR/plugins"
+         echo "ww_oneshot_crosshair plugin is missing from $SCRIPT_DIR/plugins"
+         return 1
+      fi
+
+      if ! cp "$oneShotPlugin" "$installedPluginsPath/ww_oneshot_crosshair.lua"; then
+         append_log e "Failed to install ww_oneshot_crosshair plugin"
+         echo "Failed to install ww_oneshot_crosshair plugin"
+         return 1
+      fi
+
+      append_log i "Installed ww_oneshot_crosshair plugin"
+      echo "Installed ww_oneshot_crosshair plugin"
+   fi
+
+   return 0
+}
 
 
+function genericConfigAddonsHandler {
+   title_print "Generic config Addons Setup"
 
+   declare -Ag selectedGenericAddons=()
+   local addonChoice=""
+   local addonName=""
+   local addonDescription=""
+   local addonType=""
+   local invalidAddon=""
+   local selectedAddon=""
+   local selectedIndex=""
+   local addonNumber=1
+   local -a addonNames=()
+
+   echo "Available addons:"
+   for addonName in "${!genericAddons[@]}"; do      addonNames[$addonNumber]="$addonName"
+      IFS='|' read -r _ addonDescription addonType <<< "${genericAddons[$addonName]}"
+      printf '  %-18s %s\n' "$addonNumber" "$addonDescription"
+      addonNumber=$((addonNumber + 1))
+   done
+
+   while true; do
+      read -r -p "Enter addon numbers separated by spaces or * for all: " addonChoice
+      addonChoice=${addonChoice//,/ }
+      selectedGenericAddons=()
+
+      if [[ "$addonChoice" == "*" ]]; then
+         for addonName in "${!genericAddons[@]}"; do
+            selectedGenericAddons["$addonName"]=1
+         done
+         break
+      fi
+
+      invalidAddon=""
+      for selectedAddon in $addonChoice; do
+         if [[ "$selectedAddon" =~ ^[0-9]+$ ]] && (( selectedAddon > 0 && selectedAddon < addonNumber )); then
+            selectedIndex="${addonNames[$selectedAddon]}"
+            selectedGenericAddons["$selectedIndex"]=1
+         else
+            invalidAddon="$selectedAddon"
+            break
+         fi
+      done
+
+      if [[ -n "$invalidAddon" ]]; then
+         selectedGenericAddons=()
+         echo "Unknown addon number: $invalidAddon"
+         echo "Choose a number from 1 to $((addonNumber - 1)), or * for all."
+         continue
+      fi
+
+      if [[ ${#selectedGenericAddons[@]} -eq 0 ]]; then
+         echo "Please select at least one addon."
+         continue
+      fi
+
+      break
+   done
+
+   if ! plugWaywallHandler; then
+      echo "User declined plugin backup; addon setup cannot continue."
+      return 1
+   fi
+
+   append_log i "Selected generic addons: ${!selectedGenericAddons[*]}"
+   echo "Selected addons: ${!selectedGenericAddons[*]}"
+   title_print "Plugin Addons Setup Complete"
+}
+
+function mainMenu {
+   local menuChoice=""
+
+   while true; do
+      title_print "Snaws Waywall Setup"
+      echo "1) Waywall and Prism setup"
+      echo "2) Generic config addons using plug.waywall"
+      echo "q) Quit"
+      read -r -p "Choose an option: " menuChoice
+
+      case "$(to_lowercase "$menuChoice")" in
+         1)
+            waywallPrismSetup || return 1
+            waywallConfigHandler || return 1
+            title_print "Waywall and Prism Setup Complete"
+            return 0
+            ;;
+         2)
+            genericConfigAddonsHandler || return 1
+            return 0
+            ;;
+         q|quit)
+            echo "Exiting."
+            return 0
+            ;;
+         *)
+            echo "Invalid choice. Please choose 1, 2, or q."
+            ;;
+      esac
+   done
+}
+
+mainMenu
