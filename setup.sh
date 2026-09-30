@@ -1,7 +1,12 @@
 #!/bin/bash
 
+if [[ -n "${SUDO_USER:-}" || ${EUID:-$(id -u)} -eq 0 ]]; then
+   echo "[ERROR] This script must be run as your normal user, not with sudo: bash setup.sh"
+   exit 1
+fi
+
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-LOG_FILE="$PWD/.setup.sh.log"
+LOG_FILE="$SCRIPT_DIR/_setup.sh.log"
 NINBOT_GREENBOAT_GODSENS_XMLURI="https://raw.githubusercontent.com/lemonsnaw/snaws-waywall-installer/refs/heads/main/prefs.xml"
 
 TMP_DIR="/tmp/snawswaywallinstaller"
@@ -43,26 +48,37 @@ if [[ $architecture != "x86_64" ]]; then
    exit 1
 fi
 
-fedoraString=$(grep ^ID= /etc/os-release | cut -d "=" -f 2 | tr '[:upper:]' '[:lower:]')
-fedoraVersion=$(grep '^VERSION_ID=' /etc/os-release | cut -d '=' -f 2 | tr -d '"')
-echo "$fedoraString"
-echo "$fedoraVersion"
+OS_ID=$(grep ^ID= /etc/os-release | cut -d "=" -f 2 | tr '[:upper:]' '[:lower:]')
+OS_VERSION=$(grep '^VERSION_ID=' /etc/os-release | cut -d '=' -f 2 | tr -d '"')
+echo "$OS_ID"
+echo "$OS_VERSION"
 
-if [[ $fedoraString != "fedora" ]]; then
-   echo "[ERROR] Currently this script is supports only Fedora"
+if [[ "$OS_ID" != "fedora" && "$OS_ID" != "nobara" ]]; then
+    echo "[ERROR] This script supports only Fedora 42+ and Nobara 42+"
+    exit 1
+fi
+
+if [[ "$OS_ID" == "fedora" && "$OS_VERSION" -lt 42 ]]; then
+   echo "[ERROR] Currently this script is supports only Fedora 42+ and Nobara42+"
    exit 1
-fi 
+fi
 
+if [[ "$OS_ID" == "nobara" && "$OS_VERSION" -lt 42 ]]; then
+   echo "[ERROR] Currently this script is supports only Fedora 42+ and Nobara42+"
+   exit 1
+fi
 
 function append_log {
    if [[ $1 == "i" ]]; then
       echo "[INFO] $2" >> "$LOG_FILE"
+      
    elif [[ $1 == "e" ]]; then
       echo "[ERROR] $2" >> "$LOG_FILE"
    else
       echo "[UNKNOWN] $1" >> "$LOG_FILE"
    fi
 }
+
 
 function title_print {
    echo "==============================="
@@ -79,10 +95,6 @@ trap sigIntHandler SIGINT
 
 MCSR_RANKED_PACK_URL="https://redlime.github.io/MCSRMods/modpacks/v4/MCSRRanked-Linux-1.16.1-Basic-w-SS.mrpack"
 
-if [[ $fedoraVersion -lt 44 ]]; then
-   echo "[ERROR] This script supports only Fedora 44 and above"
-   exit 1
-fi
 
 function flatpakPrismHandler {
    local flatpakApp="org.prismlauncher.PrismLauncher"
@@ -144,6 +156,94 @@ function flatpakPrismHandler {
    echo "flatpak prism removed and instances backed up"
    return 0
 }
+function installAdoptiumJDKRedhatBased {
+   sudo dnf -y install adoptium-temurin-java-repository
+   adoptiumRepoAdded=$?
+   if [[ $adoptiumRepoAdded -ne 0 ]]; then
+      append_log e "Failed to add adoptium repo"
+      return 1
+   fi
+   append_log i "Adoptium repo added successfully"
+
+   sudo fedora-third-party enable
+   fedoraThirdPartyEnabled=$?
+   if [[ $fedoraThirdPartyEnabled -ne 0 ]]; then
+      append_log e "Failed to enable fedora-third-party"
+      return 1
+   fi
+   append_log i "fedora-third-party enabled successfully"
+
+   sudo dnf -y makecache
+   dnfMakeCache=$?
+   if [[ $dnfMakeCache -ne 0 ]]; then
+      append_log e "Failed to update the dnf cache"
+      return 1
+   fi
+   append_log i "Cache updated successfully"
+   sudo dnf -y install temurin-21-jdk
+   jdkInstall=$?
+   if [[ $jdkInstall -ne 0 ]]; then
+      append_log e "Failed to install temurin-21-jdk"
+      return 1
+   fi
+   append_log i "temurin-21-jdk installed successfully"
+   JDK_VERSION_INSTALLED=21
+
+   if [[ ! -d "/usr/lib/jvm/temurin-21-jdk" ]]; then
+      append_log e "JDK not present at /usr/lib/jvm/temurin-21-jdk"
+      return 1
+   fi
+
+   append_log i "JDK is present at /usr/lib/jvm/temurin-21-jdk"
+   sudo alternatives --install /usr/bin/java java /usr/lib/jvm/temurin-21-jdk/bin/java 1
+   sudo alternatives --set java /usr/lib/jvm/temurin-21-jdk/bin/java
+   alternativesSet=$?
+   if [[ $alternativesSet -ne 0 ]]; then
+      append_log e "Failed to set alternatives for java"
+      return 1
+   fi
+   append_log i "Alternatives for java set successfully"
+   append_log i "Adoptium java installed successfully"
+   return 0
+}
+
+function javaHandlerFedoraNobara {
+   if [[ $1 == "fedora" ]]; then
+      append_log i "Fedora detected $OS_VERSION"
+      if [[ $2 -eq 44 ]]; then
+            if ! installAdoptiumJDKRedhatBased ; then
+            append_log e "Somethign went wrong while isntalling JDK"
+            exit 1
+            fi
+      elif [[ $2 -eq 43 || $2 -eq 42 ]]; then
+         if ! installAdoptiumJDKRedhatBased ; then
+            append_log e "Somethign went wrong while isntalling JDK"
+            exit 1
+         fi
+      else
+         append_log e "Unsupported Fedora version for Java install: $2"
+         exit 1
+      fi
+   elif [[ $1 == "nobara" ]]; then 
+      append_log i "Nobara detected $OS_VERSION"
+      if [[ $2 -eq 44 ]]; then
+         if ! installAdoptiumJDKRedhatBased ; then
+            append_log e "Somethign went wrong while isntalling JDK"
+            exit 1
+         fi
+      elif [[ $2 -eq 43 || $2 -eq 42 ]]; then
+         if ! installAdoptiumJDKRedhatBased ; then
+            append_log e "Somethign went wrong while isntalling JDK"
+            exit 1
+         fi
+      else
+         append_log e "Unsupported Nobara version for Java install: $2"
+         exit 1
+      fi
+   fi
+}
+
+
 
 function waywallPrismSetup {
    local waywallRpmPath="$TMP_DIR/waywall.rpm"
@@ -153,54 +253,8 @@ function waywallPrismSetup {
    flatpakPrismHandler || return 1
 
    title_print "Installing JDK and Prism Launcher (no user input required)"
-
-   sudo dnf -y install adoptium-temurin-java-repository
-   adoptiumRepoAdded=$?
-   if [[ $adoptiumRepoAdded -ne 0 ]]; then
-      append_log e "Failed to add adoptium repo"
-      exit 1
-   fi
-   append_log i "Adoptium repo added successfully"
-
-   sudo fedora-third-party enable
-   fedoraThirdPartyEnabled=$?
-   if [[ $fedoraThirdPartyEnabled -ne 0 ]]; then
-      append_log e "Failed to enable fedora-third-party"
-      exit 1
-   fi
-   append_log i "fedora-third-party enabled successfully"
-
-   sudo dnf -y makecache
-   dnfMakeCache=$?
-   if [[ $dnfMakeCache -ne 0 ]]; then
-      append_log e "Failed to update the dnf cache"
-      exit 1
-   fi
-   append_log i "Cache updated successfully"
-   sudo dnf -y install temurin-21-jdk
-   jdkInstall=$?
-   if [[ $jdkInstall -ne 0 ]]; then
-      append_log e "Failed to install temurin-21-jdk"
-      exit 1
-   fi
-   append_log i "temurin-21-jdk installed successfully"
-   JDK_VERSION_INSTALLED=21
-
-   if [[ ! -d "/usr/lib/jvm/temurin-21-jdk" ]]; then
-      append_log e "JDK not present at /usr/lib/jvm/temurin-21-jdk"
-      exit 1
-   fi
-
-   append_log i "JDK is present at /usr/lib/jvm/temurin-21-jdk"
-   sudo alternatives --install /usr/bin/java java /usr/lib/jvm/temurin-21-jdk/bin/java 1
-   sudo alternatives --set java /usr/lib/jvm/temurin-21-jdk/bin/java
-   alternativesSet=$?
-   if [[ $alternativesSet -ne 0 ]]; then
-      append_log e "Failed to set alternatives for java"
-      exit 1
-   fi
-   append_log i "Alternatives for java set successfully"
-
+   javaHandlerFedoraNobara $OS_ID $OS_VERSION
+   
    sudo dnf -y copr enable g3tchoo/prismlauncher
    coprEnable=$?
    if [[ $coprEnable -ne 0 ]]; then
@@ -216,15 +270,38 @@ function waywallPrismSetup {
       exit 1
    fi
    append_log i "prismlauncher installed successfully"
+   
+   
+   
+   title_print "Prism Launcher Ranked Instance Setup (User Input Required)"
+   while true; do
 
-   title_print "Import MCSR Ranked Instance"
-   read -r -n 1 -s -p "Script will open the MCSR Ranked pack in Prism Launcher, accept and press ok and launch the instance. Press any key to continue..."
-   echo
-   append_log i "Opening Prism Launcher to import MCSR Ranked modpack"
-   prismlauncher --import "$MCSR_RANKED_PACK_URL" >/dev/null 2>&1 &
-   prismImportPid=$!
-   append_log i "Started Prism Launcher for MCSR Ranked import (PID $prismImportPid)"
-   echo "Prism Launcher started in the background (PID $prismImportPid)."
+      read -p "Do you want to import MCSR Ranked Pack for Prism Launcher? type n if you are already have configured instance , you will be asked for path in next section [y/n] :" prismInstanceChoice
+      prismInstanceChoice=$(to_lowercase "$prismInstanceChoice")
+
+      case "$prismInstanceChoice" in
+         y|yes)
+               
+               read -r -n 1 -s -p "Script will open the MCSR Ranked pack in Prism Launcher, accept and press ok and launch the instance. Press any key to continue..."
+               echo
+               append_log i "Opening Prism Launcher to import MCSR Ranked modpack"
+               prismlauncher --import "$MCSR_RANKED_PACK_URL" >/dev/null 2>&1 &
+               prismImportPid=$!
+               append_log i "Started Prism Launcher for MCSR Ranked import (PID $prismImportPid)"
+               echo "Prism Launcher started in the background (PID $prismImportPid)."
+            ;;
+         n|no)
+         break
+            ;;
+         *)
+            echo "Invalid choice. Please type y for yes or n for no(you already have mcsr ranked instance setup)."
+            ;;
+      esac
+   done
+
+
+
+
 
    title_print "Ranked Instance Path Setup (User Input Required)"
    echo "Complete the import and launch the instance once, then enter its path below."
@@ -324,10 +401,7 @@ function waywallPrismSetup {
          { print }
          ' "$prismConfigFile" > "$prismTempConfig" && mv -f "$prismTempConfig" "$prismConfigFile"
       append_log i "prism config file updated successfully at $prismConfigFile"
-      append_log i "updating permissions for prism config file at $prismConfigFile"
-      chown "$TARGET_USER":"$TARGET_USER" "$prismConfigFile"
-      chmod a+rw "$prismConfigFile"
-      append_log i "permissions updated successfully for prism config file at $prismConfigFile"
+append_log i "Prism config permissions: $(ls -l "$prismConfigFile")"
    else
       append_log e "prism config file not found at $prismConfigFile"
       exit 1
