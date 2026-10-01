@@ -289,6 +289,7 @@ function waywallPrismSetup {
                prismImportPid=$!
                append_log i "Started Prism Launcher for MCSR Ranked import (PID $prismImportPid)"
                echo "Prism Launcher started in the background (PID $prismImportPid)."
+               break;
             ;;
          n|no)
          break
