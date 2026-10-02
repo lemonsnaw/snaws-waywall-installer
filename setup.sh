@@ -11,7 +11,7 @@ NINBOT_GREENBOAT_GODSENS_XMLURI="https://raw.githubusercontent.com/lemonsnaw/sna
 
 TMP_DIR="/tmp/snawswaywallinstaller"
 mkdir -p "$TMP_DIR"
-rm -f "$TMP_DIR/waywall.rpm" "$TMP_DIR/prefs.xml" "$TMP_DIR/prism-instance.cfg.tmp"
+rm -f "$TMP_DIR/waywall.rpm" "$TMP_DIR/waywall.deb" "$TMP_DIR/prefs.xml" "$TMP_DIR/prism-instance.cfg.tmp"
 
 if [[ ! -f "$LOG_FILE" ]]; then
    echo "Creating log file"
@@ -244,41 +244,73 @@ function javaHandlerFedoraNobara {
 }
 
 
+function prismJavaHandlerFedoraNobara {
+      local prismTempConfig="$TMP_DIR/prism-instance.cfg.tmp"
+      flatpakPrismHandler || return 1
+      title_print "Installing JDK and Prism Launcher (no user input required)"
+      javaHandlerFedoraNobara $OS_ID $OS_VERSION
+      sudo dnf -y copr enable g3tchoo/prismlauncher
+      coprEnable=$?
+      if [[ $coprEnable -ne 0 ]]; then
+         append_log e "Failed to enable copr g3tchoo/prismlauncher"
+         exit 1
+      fi
+      append_log i "Copr g3tchoo/prismlauncher enabled successfully"
 
-function waywallPrismSetup {
-   local waywallRpmPath="$TMP_DIR/waywall.rpm"
-   local prismTempConfig="$TMP_DIR/prism-instance.cfg.tmp"
+      sudo dnf -y install prismlauncher
+      prismInstall=$?
+      if [[ $prismInstall -ne 0 ]]; then
+         append_log e "Failed to install prismlauncher"
+         exit 1
+      fi
+      append_log i "prismlauncher installed successfully"
+   
+}
+function ninbotHandler {
    local downloadedPrefsFile="$TMP_DIR/prefs.xml"
-
-   flatpakPrismHandler || return 1
-
-   title_print "Installing JDK and Prism Launcher (no user input required)"
-   javaHandlerFedoraNobara $OS_ID $OS_VERSION
-   
-   sudo dnf -y copr enable g3tchoo/prismlauncher
-   coprEnable=$?
-   if [[ $coprEnable -ne 0 ]]; then
-      append_log e "Failed to enable copr g3tchoo/prismlauncher"
-      exit 1
+   if [[ ! -d "$HOME/.java/.userPrefs/ninjabrainbot" ]]; then
+      mkdir -p "$HOME/.java/.userPrefs/ninjabrainbot"
+      if [[ $? -ne 0 ]]; then
+         append_log e "Failed to create directory $HOME/.java/.userPrefs/ninjabrainbot; ninjabrainbot settings will be skipped"
+      else
+         append_log i "Created directory $HOME/.java/.userPrefs/ninjabrainbot for ninjabrainbot settings"
+      fi
    fi
-   append_log i "Copr g3tchoo/prismlauncher enabled successfully"
 
-   sudo dnf -y install prismlauncher
-   prismInstall=$?
-   if [[ $prismInstall -ne 0 ]]; then
-      append_log e "Failed to install prismlauncher"
-      exit 1
+   if [[ -f "$HOME/.java/.userPrefs/ninjabrainbot/prefs.xml" ]]; then
+      append_log i "prefs.xml already exists at $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml, skipping modifications to it"
+   else
+      if [[ -f "$downloadedPrefsFile" ]]; then
+         append_log i "prefs.xml found in $downloadedPrefsFile, copying to $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
+         cp "$downloadedPrefsFile" "$HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
+         if [[ $? -ne 0 ]]; then
+            append_log e "Failed to copy prefs.xml to $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
+         else
+            append_log i "Copied prefs.xml to $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
+         fi
+      else
+         append_log i "prefs.xml not found in $TMP_DIR, downloading from $NINBOT_GREENBOAT_GODSENS_XMLURI"
+         curl -fL -o "$downloadedPrefsFile" "$NINBOT_GREENBOAT_GODSENS_XMLURI"
+         if [[ $? -ne 0 ]]; then
+            append_log e "Failed to download prefs.xml from $NINBOT_GREENBOAT_GODSENS_XMLURI"
+         else
+            append_log i "Downloaded prefs.xml from $NINBOT_GREENBOAT_GODSENS_XMLURI"
+            cp "$downloadedPrefsFile" "$HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
+            if [[ $? -ne 0 ]]; then
+               append_log e "Failed to copyConfiguration downloaded prefs.xml to $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
+            else
+               append_log i "Copied downloaded prefs.xml to $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
+            fi
+         fi
+      fi
    fi
-   append_log i "prismlauncher installed successfully"
-   
-   
-   
-   title_print "Prism Launcher Ranked Instance Setup (User Input Required)"
+}
+function prismInstanceHandler {
+      title_print "Prism Launcher Ranked Instance Setup (User Input Required)"
    while true; do
 
       read -p "Do you want to import MCSR Ranked Pack for Prism Launcher? type n if you are already have configured instance , you will be asked for path in next section [y/n] :" prismInstanceChoice
       prismInstanceChoice=$(to_lowercase "$prismInstanceChoice")
-
       case "$prismInstanceChoice" in
          y|yes)
                
@@ -299,11 +331,6 @@ function waywallPrismSetup {
             ;;
       esac
    done
-
-
-
-
-
    title_print "Ranked Instance Path Setup (User Input Required)"
    echo "Complete the import and launch the instance once, then enter its path below."
    echo "example path: /home/snaw/.local/share/PrismLauncher/instances/MCSRRanked-Linux-1.16.1-Basic-w-SS"
@@ -320,6 +347,55 @@ function waywallPrismSetup {
       echo "Ranked instance path is invalid, please try again or ctrl+c to exit"
    done
 
+   TARGET_USER="${SUDO_USER:-$(whoami)}"
+
+   title_print "Prism waywall configuration in progress"
+   append_log i "Configuring prism to use waywall"
+   read -p "Prism launcher and minecraft instance has to closed to write to config , please press any key to continue it will be automically closed if it is open:"
+
+   append_log i "Closing prism launcher if it is open"
+
+   prismids="$(ps -e | grep -c prismlauncher)"
+   if [[ $prismids -gt 0 ]]; then
+      append_log i "Prism launcher is open, closing it"
+      # I checked that killing prism it does kill minecraft instances so I am keeping it that way
+      # here minecraft instances are also killed
+      pkill -f prismlauncher
+      if [[ $? -ne 0 ]]; then
+         append_log e "Failed to close prism launcher"
+         exit 1
+      fi
+      append_log i "Prism launcher closed successfully"
+   else
+      append_log i "Prism launcher is not open, proceeding with configuration"
+   fi
+
+   prismConfigFile="$rankedinstancepath/instance.cfg"
+   if [[ -f "$prismConfigFile" ]]; then
+      append_log i "prism config file found at $prismConfigFile"
+      awk '
+         /^\[General\]/ {
+            print
+            print "OverrideCommands=true"
+            print "OverrideNativeWorkarounds=true"
+            print "CustomGLFWPath=/usr/local/lib64/waywall-glfw/libglfw.so"
+            print "IgnoreJavaCompatibility=true"
+            print "UseNativeGLFW=true"
+            print "WrapperCommand=waywall wrap --"
+            next
+         }
+         { print }
+         ' "$prismConfigFile" > "$prismTempConfig" && mv -f "$prismTempConfig" "$prismConfigFile"
+      append_log i "prism config file updated successfully at $prismConfigFile"
+      append_log i "Prism config permissions: $(ls -l "$prismConfigFile")"
+   else
+      append_log e "prism config file not found at $prismConfigFile"
+      exit 1
+   fi
+}
+
+function waywallPrismSetup {
+   local waywallRpmPath="$TMP_DIR/waywall.rpm"
    title_print "Waywall installation and configuration (No user input required)"
    append_log i "Starting waywall installation and configuration"
 
@@ -362,87 +438,8 @@ function waywallPrismSetup {
       append_log i "waywall.rpm installed successfully"
    fi
 
-   TARGET_USER="${SUDO_USER:-$(whoami)}"
-
-   title_print "Prism waywall configuration in progress"
-   append_log i "Configuring prism to use waywall"
-   read -p "Prism launcher and minecraft instance has to closed to write to config , please press any key to continue it will be automically closed if it is open:"
-
-   append_log i "Closing prism launcher if it is open"
-
-   prismids="$(ps -e | grep -c prismlauncher)"
-   if [[ $prismids -gt 0 ]]; then
-      append_log i "Prism launcher is open, closing it"
-      # I checked that killing prism it does kill minecraft instances so I am keeping it that way
-      # here minecraft instances are also killed
-      pkill -f prismlauncher
-      if [[ $? -ne 0 ]]; then
-         append_log e "Failed to close prism launcher"
-         exit 1
-      fi
-      append_log i "Prism launcher closed successfully"
-   else
-      append_log i "Prism launcher is not open, proceeding with configuration"
-   fi
-
-   prismConfigFile="$rankedinstancepath/instance.cfg"
-   if [[ -f "$prismConfigFile" ]]; then
-      append_log i "prism config file found at $prismConfigFile"
-      awk '
-         /^\[General\]/ {
-            print
-            print "OverrideCommands=true"
-            print "OverrideNativeWorkarounds=true"
-            print "CustomGLFWPath=/usr/local/lib64/waywall-glfw/libglfw.so"
-            print "IgnoreJavaCompatibility=true"
-            print "UseNativeGLFW=true"
-            print "WrapperCommand=waywall wrap --"
-            next
-         }
-         { print }
-         ' "$prismConfigFile" > "$prismTempConfig" && mv -f "$prismTempConfig" "$prismConfigFile"
-      append_log i "prism config file updated successfully at $prismConfigFile"
-append_log i "Prism config permissions: $(ls -l "$prismConfigFile")"
-   else
-      append_log e "prism config file not found at $prismConfigFile"
-      exit 1
-   fi
-   if [[ ! -d "$HOME/.java/.userPrefs/ninjabrainbot" ]]; then
-      mkdir -p "$HOME/.java/.userPrefs/ninjabrainbot"
-      if [[ $? -ne 0 ]]; then
-         append_log e "Failed to create directory $HOME/.java/.userPrefs/ninjabrainbot; ninjabrainbot settings will be skipped"
-      else
-         append_log i "Created directory $HOME/.java/.userPrefs/ninjabrainbot for ninjabrainbot settings"
-      fi
-   fi
-
-   if [[ -f "$HOME/.java/.userPrefs/ninjabrainbot/prefs.xml" ]]; then
-      append_log i "prefs.xml already exists at $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml, skipping modifications to it"
-   else
-      if [[ -f "$downloadedPrefsFile" ]]; then
-         append_log i "prefs.xml found in $downloadedPrefsFile, copying to $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
-         cp "$downloadedPrefsFile" "$HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
-         if [[ $? -ne 0 ]]; then
-            append_log e "Failed to copy prefs.xml to $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
-         else
-            append_log i "Copied prefs.xml to $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
-         fi
-      else
-         append_log i "prefs.xml not found in $TMP_DIR, downloading from $NINBOT_GREENBOAT_GODSENS_XMLURI"
-         curl -fL -o "$downloadedPrefsFile" "$NINBOT_GREENBOAT_GODSENS_XMLURI"
-         if [[ $? -ne 0 ]]; then
-            append_log e "Failed to download prefs.xml from $NINBOT_GREENBOAT_GODSENS_XMLURI"
-         else
-            append_log i "Downloaded prefs.xml from $NINBOT_GREENBOAT_GODSENS_XMLURI"
-            cp "$downloadedPrefsFile" "$HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
-            if [[ $? -ne 0 ]]; then
-               append_log e "Failed to copyConfiguration downloaded prefs.xml to $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
-            else
-               append_log i "Copied downloaded prefs.xml to $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
-            fi
-         fi
-      fi
-   fi
+   
+   
 
    append_log i "finished"
    title_print "Configuration finished"
