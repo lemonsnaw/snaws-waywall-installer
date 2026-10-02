@@ -5,6 +5,22 @@ if [[ -n "${SUDO_USER:-}" || ${EUID:-$(id -u)} -eq 0 ]]; then
    exit 1
 fi
 
+SUPPORTED_OS=("fedora" "nobara")
+declare -A SUPPORTED_VERSIONS
+SUPPORTED_VERSIONS["fedora"]="42 43 44"
+SUPPORTED_VERSIONS["nobara"]="42 43 44"
+
+function append_log {
+   if [[ $1 == "i" ]]; then
+      echo "[INFO] $2" >> "$LOG_FILE"
+   elif [[ $1 == "e" ]]; then
+      echo "[ERROR] $2" >> "$LOG_FILE"
+   else
+      echo "[UNKNOWN] $1" >> "$LOG_FILE"
+   fi
+}
+
+
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 LOG_FILE="$SCRIPT_DIR/_setup.sh.log"
 NINBOT_GREENBOAT_GODSENS_XMLURI="https://raw.githubusercontent.com/lemonsnaw/snaws-waywall-installer/refs/heads/main/prefs.xml"
@@ -53,33 +69,53 @@ OS_VERSION=$(grep '^VERSION_ID=' /etc/os-release | cut -d '=' -f 2 | tr -d '"')
 echo "$OS_ID"
 echo "$OS_VERSION"
 
-if [[ "$OS_ID" != "fedora" && "$OS_ID" != "nobara" ]]; then
-    echo "[ERROR] This script supports only Fedora 42+ and Nobara 42+"
-    exit 1
-fi
+is_supported_os=false
+for os in "${SUPPORTED_OS[@]}"; do
+   if [[ "$OS_ID" == "$os" ]]; then
+      append_log i "Detected supported OS: $OS_ID"
+      append_log i "Checking for supported version: $OS_VERSION"
+      for version in ${SUPPORTED_VERSIONS[$os]}; do
+         if [[ "$OS_VERSION" == "$version" ]]; then
+            is_supported_os=true
+            break
+         fi
+      done
+      if [[ "$is_supported_os" == true ]]; then
+         echo "Supported OS and version detected: $OS_ID $OS_VERSION"
+         append_log i "Supported OS and version detected: $OS_ID $OS_VERSION"
+         break
+      fi
 
-if [[ "$OS_ID" == "fedora" && "$OS_VERSION" -lt 42 ]]; then
-   echo "[ERROR] Currently this script is supports only Fedora 42+ and Nobara42+"
-   exit 1
-fi
-
-if [[ "$OS_ID" == "nobara" && "$OS_VERSION" -lt 42 ]]; then
-   echo "[ERROR] Currently this script is supports only Fedora 42+ and Nobara42+"
-   exit 1
-fi
-
-function append_log {
-   if [[ $1 == "i" ]]; then
-      echo "[INFO] $2" >> "$LOG_FILE"
-      
-   elif [[ $1 == "e" ]]; then
-      echo "[ERROR] $2" >> "$LOG_FILE"
-   else
-      echo "[UNKNOWN] $1" >> "$LOG_FILE"
+      echo "Unsupported version for $OS_ID: $OS_VERSION. Supported versions are: ${SUPPORTED_VERSIONS[$os]}"
+      append_log e "Unsupported version for $OS_ID: $OS_VERSION. Supported versions are: ${SUPPORTED_VERSIONS[$os]}"
+      exit 1
    fi
+done
+if [[ "$is_supported_os" == false ]]; then
+   echo "[ERROR] Unsupported OS: $OS_ID. Supported OS are: ${SUPPORTED_OS[*]}"
+   append_log e "Unsupported OS: $OS_ID. Supported OS are: ${SUPPORTED_OS[*]}"
+   exit 1
+fi 
+
+# I am asssuming here that supported os are already handled at top
+# we are safe to proceed for the most part
+function osHandler {
+   case  "$OS_ID" in
+      fedora|nobara)
+         if ! fedoraNobaraHandler; then
+            append_log e "Fedora/Nobara handler failed"
+            echo "Something went wrong while doing the setup for Fedora/Nobara."
+            exit 1
+         fi 
+
+         ;;
+      *)
+         echo "[ERROR] Unsupported OS: $OS_ID. Supported OS are: ${SUPPORTED_OS[*]}"
+         append_log e "Unsupported OS: $OS_ID. Supported OS are: ${SUPPORTED_OS[*]}"
+         exit 1
+         ;;
+   esac
 }
-
-
 function title_print {
    echo "==============================="
    echo "$1"
@@ -207,48 +243,24 @@ function installAdoptiumJDKRedhatBased {
    return 0
 }
 
+# Here I am also assuming OS check is done at top  to proceed
+# for fedora/nobara I am just installing Adoptium JDK , even though
+# 42 43 might have openjdk , i am too lazy will fix maybe later 
+# jdk vendor wouldnt matter much 
 function javaHandlerFedoraNobara {
-   if [[ $1 == "fedora" ]]; then
-      append_log i "Fedora detected $OS_VERSION"
-      if [[ $2 -eq 44 ]]; then
-            if ! installAdoptiumJDKRedhatBased ; then
+   if ! installAdoptiumJDKRedhatBased ; then
             append_log e "Somethign went wrong while isntalling JDK"
             exit 1
-            fi
-      elif [[ $2 -eq 43 || $2 -eq 42 ]]; then
-         if ! installAdoptiumJDKRedhatBased ; then
-            append_log e "Somethign went wrong while isntalling JDK"
-            exit 1
-         fi
-      else
-         append_log e "Unsupported Fedora version for Java install: $2"
-         exit 1
-      fi
-   elif [[ $1 == "nobara" ]]; then 
-      append_log i "Nobara detected $OS_VERSION"
-      if [[ $2 -eq 44 ]]; then
-         if ! installAdoptiumJDKRedhatBased ; then
-            append_log e "Somethign went wrong while isntalling JDK"
-            exit 1
-         fi
-      elif [[ $2 -eq 43 || $2 -eq 42 ]]; then
-         if ! installAdoptiumJDKRedhatBased ; then
-            append_log e "Somethign went wrong while isntalling JDK"
-            exit 1
-         fi
-      else
-         append_log e "Unsupported Nobara version for Java install: $2"
-         exit 1
-      fi
    fi
+   echo "JDK installed Successfully"
 }
 
 
 function prismJavaHandlerFedoraNobara {
-      local prismTempConfig="$TMP_DIR/prism-instance.cfg.tmp"
+      
       flatpakPrismHandler || return 1
       title_print "Installing JDK and Prism Launcher (no user input required)"
-      javaHandlerFedoraNobara $OS_ID $OS_VERSION
+      javaHandlerFedoraNobara || return 1 
       sudo dnf -y copr enable g3tchoo/prismlauncher
       coprEnable=$?
       if [[ $coprEnable -ne 0 ]]; then
@@ -264,7 +276,6 @@ function prismJavaHandlerFedoraNobara {
          exit 1
       fi
       append_log i "prismlauncher installed successfully"
-   
 }
 function ninbotHandler {
    local downloadedPrefsFile="$TMP_DIR/prefs.xml"
@@ -272,6 +283,7 @@ function ninbotHandler {
       mkdir -p "$HOME/.java/.userPrefs/ninjabrainbot"
       if [[ $? -ne 0 ]]; then
          append_log e "Failed to create directory $HOME/.java/.userPrefs/ninjabrainbot; ninjabrainbot settings will be skipped"
+         return 1
       else
          append_log i "Created directory $HOME/.java/.userPrefs/ninjabrainbot for ninjabrainbot settings"
       fi
@@ -285,6 +297,7 @@ function ninbotHandler {
          cp "$downloadedPrefsFile" "$HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
          if [[ $? -ne 0 ]]; then
             append_log e "Failed to copy prefs.xml to $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
+            return 1
          else
             append_log i "Copied prefs.xml to $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
          fi
@@ -293,21 +306,25 @@ function ninbotHandler {
          curl -fL -o "$downloadedPrefsFile" "$NINBOT_GREENBOAT_GODSENS_XMLURI"
          if [[ $? -ne 0 ]]; then
             append_log e "Failed to download prefs.xml from $NINBOT_GREENBOAT_GODSENS_XMLURI"
+            return 1
          else
             append_log i "Downloaded prefs.xml from $NINBOT_GREENBOAT_GODSENS_XMLURI"
             cp "$downloadedPrefsFile" "$HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
             if [[ $? -ne 0 ]]; then
                append_log e "Failed to copyConfiguration downloaded prefs.xml to $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
+               return 1
             else
                append_log i "Copied downloaded prefs.xml to $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
             fi
          fi
       fi
    fi
+   return 0
 }
 function prismInstanceHandler {
+      local prismTempConfig="$TMP_DIR/prism-instance.cfg.tmp"
       title_print "Prism Launcher Ranked Instance Setup (User Input Required)"
-   while true; do
+      while true; do
 
       read -p "Do you want to import MCSR Ranked Pack for Prism Launcher? type n if you are already have configured instance , you will be asked for path in next section [y/n] :" prismInstanceChoice
       prismInstanceChoice=$(to_lowercase "$prismInstanceChoice")
@@ -319,6 +336,11 @@ function prismInstanceHandler {
                append_log i "Opening Prism Launcher to import MCSR Ranked modpack"
                prismlauncher --import "$MCSR_RANKED_PACK_URL" >/dev/null 2>&1 &
                prismImportPid=$!
+               if [[ $? -ne 0 ]]; then
+                  append_log e "Failed import mcsr ranked isntance "
+                  echo "Failed to start prism launcher."
+                  return 1
+               fi 
                append_log i "Started Prism Launcher for MCSR Ranked import (PID $prismImportPid)"
                echo "Prism Launcher started in the background (PID $prismImportPid)."
                break;
@@ -331,6 +353,7 @@ function prismInstanceHandler {
             ;;
       esac
    done
+
    title_print "Ranked Instance Path Setup (User Input Required)"
    echo "Complete the import and launch the instance once, then enter its path below."
    echo "example path: /home/snaw/.local/share/PrismLauncher/instances/MCSRRanked-Linux-1.16.1-Basic-w-SS"
@@ -363,7 +386,7 @@ function prismInstanceHandler {
       pkill -f prismlauncher
       if [[ $? -ne 0 ]]; then
          append_log e "Failed to close prism launcher"
-         exit 1
+         return 1
       fi
       append_log i "Prism launcher closed successfully"
    else
@@ -386,24 +409,53 @@ function prismInstanceHandler {
          }
          { print }
          ' "$prismConfigFile" > "$prismTempConfig" && mv -f "$prismTempConfig" "$prismConfigFile"
+      if [[ $? -ne 0 ]]; then
+         append_log e "Failed to update prism config file at $prismConfigFile"
+         echo "Failed to update prism config file at $prismConfigFile, please manually add glfw path and wrapper command"
+         return 1
+      fi
       append_log i "prism config file updated successfully at $prismConfigFile"
       append_log i "Prism config permissions: $(ls -l "$prismConfigFile")"
    else
       append_log e "prism config file not found at $prismConfigFile"
+      return 1
+   fi
+   return 0
+}
+function fedoraNobaraHandler {
+   if ! prismJavaHandlerFedoraNobara; then
+      append_log e "Somethign went wrong while installing jdk and prism"
+      echo "Somethign went wrong while installing jdk and prism $LOG_FILE"
       exit 1
    fi
+
+   if ! prismInstanceHandler; then
+      append_log e "Prism instance configuration failed"
+      echo "Prism Instance configuration, please do the changes manually, waywall,ninbot installation will continue"
+      exit 1
+   fi
+   if ! ninbotHandler; then
+      append_log e "ninbot configuration failed for boateye please do it manually"
+      echo "ninbot configuration failed for boateye, please setup boateye, waywall installation will continue"
+      exit 1
+   fi
+   waywallFedoraNobaraHandler
 }
-
-function waywallPrismSetup {
-   local waywallRpmPath="$TMP_DIR/waywall.rpm"
-   title_print "Waywall installation and configuration (No user input required)"
+function waywallFedoraNobaraHandler {
+    local waywallRpmPath="$TMP_DIR/waywall.rpm"
+    title_print "Waywall installation and configuration (No user input required)"
    append_log i "Starting waywall installation and configuration"
-
    isWaywallInstalled=$(dnf list installed waywall 2>/dev/null | grep -c waywall)
    if [[ $isWaywallInstalled -eq 1 ]]; then
       append_log i "Waywall is already installed, skipping installation"
+      if ! waywallinstalltionVerification; then
+         append_log e "Waywall installation verification failed"
+         echo "Failed to verify waywall installation"
+         exit 1
+      fi
    elif [[ $isWaywallInstalled -eq 0 ]]; then
       append_log i "Waywall is not installed, proceeding with installation"
+      echo "Waywall is not installed, proceeding with installation"
       append_log i "Downloading waywall.rpm"
 
       curl -fL -o "$waywallRpmPath" https://github.com/tesselslate/waywall/releases/download/0.2026.06.13/waywall-0.5-1.fc42.x86_64.rpm
@@ -420,29 +472,40 @@ function waywallPrismSetup {
          append_log e "Failed to install waywall.rpm"
          exit 1
       fi
+      if ! waywallinstalltionVerification; then
+         append_log e "Waywall installation verification failed"
+         echo "Failed to verify waywall installation"
 
+         exit 1
+      fi
+   fi
+   echo "Waywall Installed and verified successfully"
+}
+function waywallinstalltionVerification {
       title_print "Waywall verfication in progress"
       append_log i "Verifying waywall installation"
       if [[ -f /usr/bin/waywall ]]; then
          append_log i "waywall binary found at /usr/bin/waywall"
       else
          append_log e "waywall binary not found at /usr/bin/waywall"
-         exit 1
+         append_log i "dir /usr/bin/waywall:"
+         append_log i "$(ls -l /usr/bin/waywall)"
+         append_log i "dir /usr/local/lib64/waywall-glfw:"
+         append_log i "$(ls -l /usr/local/lib64/waywall-glfw)"
+         return 1
       fi
       if [[ -f /usr/local/lib64/waywall-glfw/libglfw.so ]]; then
          append_log i "waywall-glfw library found at /usr/local/lib64/waywall-glfw/libglfw.so"
       else
          append_log e "waywall-glfw library not found at /usr/local/lib64/waywall-glfw/libglfw.so"
-         exit 1
+         append_log i "dir /usr/bin/waywall:"
+         append_log i "$(ls -l /usr/bin/waywall)"
+         append_log i "dir /usr/local/lib64/waywall-glfw:"
+         append_log i "$(ls -l /usr/local/lib64/waywall-glfw)"
+         return 1
       fi
       append_log i "waywall.rpm installed successfully"
-   fi
-
-   
-   
-
-   append_log i "finished"
-   title_print "Configuration finished"
+   return 0
 }
 
    
@@ -836,7 +899,7 @@ function mainMenu {
 
       case "$(to_lowercase "$menuChoice")" in
          1)
-            waywallPrismSetup || return 1
+            osHandler || return 1
             waywallConfigHandler || return 1
             title_print "Waywall and Prism Setup Complete"
             return 0
