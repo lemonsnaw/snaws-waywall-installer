@@ -321,7 +321,7 @@ function javaHandlerArchBased {
    append_log i "java-21-openjdk-amd64 set as default successfully"
 }
 
-funciton prismJavaHandlerArchBased {
+function prismJavaHandlerArchBased {
    flatpakPrismHandler || return 1
    title_print "Installing JDK and Prism Launcher (no user input required)"
    javaHandlerArchBased || return 1
@@ -586,11 +586,12 @@ function ubuntuDebianHandler {
    waywallUbuntuHandler
 }
 function archBasedHandler {
-   if ! command -v curl >/dev/null 2>&1; then
+
+   if ! pacman -Q curl >/dev/null 2>&1; then
          append_log e "curl is not installed,installing curl"
          sudo pacman -Sy --noconfirm curl
       fi
-   if ! command -v git >/dev/null 2>&1; then
+   if ! pacman -Q git >/dev/null 2>&1; then
          append_log e "git is not installed,installing git"
          sudo pacman -Sy --noconfirm git
       fi
@@ -612,7 +613,7 @@ function archBasedHandler {
    waywallArchBasedHandler
 }
 
-function waywallArchBasedHandler{
+function waywallArchBasedHandler {
    local waywallpkgPath="$TMP_DIR/waywall.pkg.tar.zst"
     title_print "Waywall installation and configuration (No user input required)"
    append_log i "Starting waywall installation and configuration"
