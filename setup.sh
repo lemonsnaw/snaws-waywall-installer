@@ -482,6 +482,10 @@ function prismInstanceHandler {
    return 0
 }
 function fedoraNobaraHandler {
+     if ! command -v curl >/dev/null 2>&1; then
+         append_log e "curl is not installed,installing curl"
+         sudo dnf -y install curl
+      fi
    if ! prismJavaHandlerFedoraNobara; then
       append_log e "Somethign went wrong while installing jdk and prism"
       echo "Somethign went wrong while installing jdk and prism $LOG_FILE"
@@ -501,6 +505,10 @@ function fedoraNobaraHandler {
    waywallFedoraNobaraHandler
 }
 function ubuntuDebianHandler {
+   if ! command -v curl >/dev/null 2>&1; then
+         append_log e "curl is not installed,installing curl"
+         sudo apt -y install curl
+      fi
    if ! prismJavahandlerUbuntuDebian; then
       append_log e "Somethign went wrong while installing jdk and prism"
       echo "Somethign went wrong while installing jdk and prism $LOG_FILE"
@@ -572,7 +580,7 @@ function waywallFedoraNobaraHandler {
       append_log i "Waywall is not installed, proceeding with installation"
       echo "Waywall is not installed, proceeding with installation"
       append_log i "Downloading waywall.rpm"
-
+    
       curl -fL -o "$waywallRpmPath" https://github.com/tesselslate/waywall/releases/download/0.2026.06.13/waywall-0.5-1.fc42.x86_64.rpm
       waywallDownload=$?
       if [[ $waywallDownload -ne 0 ]]; then
