@@ -308,7 +308,7 @@ Signed-By: /usr/share/keyrings/prismlauncher-archive-keyring.gpg" | sudo tee /et
    fi
    append_log i "prismlauncher installed successfully"
    echo "Installing libxkbcommon since its missing causing ninbot to show hotkeys"
-   append i "Installing libxkbcommon since its missing causing ninbot to show hotkeys"
+   append_log i "Installing libxkbcommon since its missing causing ninbot to show hotkeys"
    sudo apt -y install libxkbcommon-x11-dev
    if [[ $? -ne 0 ]]; then
       echo "Failed to install libxkbcommon-x11-dev , package name might be different install manually to avoid issues with ninbot"
@@ -544,7 +544,8 @@ function waywallUbuntuHandler {
    local waywallDebPath="$TMP_DIR/waywall.deb"
     title_print "Waywall installation and configuration (No user input required)"
    append_log i "Starting waywall installation and configuration"
-   if dpkg-query -W -f='${db:Status-Status}' waywall 2>/dev/null | grep -qx 'installed'; then
+   local isWaywallInstalled=$(dpkg -l | grep -ic waywall)
+   if [[ $isWaywallInstalled -gt 0 ]]; then
       append_log i "Waywall is already installed, skipping installation"
       if ! waywallinstalltionVerification; then
          append_log e "Waywall installation verification failed"
@@ -581,7 +582,7 @@ function waywallFedoraNobaraHandler {
     local waywallRpmPath="$TMP_DIR/waywall.rpm"
     title_print "Waywall installation and configuration (No user input required)"
    append_log i "Starting waywall installation and configuration"
-   isWaywallInstalled=$(dnf list installed waywall 2>/dev/null | grep -c waywall)
+   local isWaywallInstalled=$(dnf list installed waywall 2>/dev/null | grep -c waywall)
    if [[ $isWaywallInstalled -eq 1 ]]; then
       append_log i "Waywall is already installed, skipping installation"
       if ! waywallinstalltionVerification; then
