@@ -7,6 +7,7 @@ This script is provided as-is, without warranty. It will install system packages
 - Fedora/Nobara (42,43,44+)
 - Ubuntu 26.01+
 - Debian 13+
+- Arch and Cachyos ( Any Arch based OS should work but I havent added all of them since I havent tested them)
 
 ## Purpose
 This is script does following:
