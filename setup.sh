@@ -1140,10 +1140,14 @@ function genericConfigAddonsHandler {
 }
 function additionalInforForUser {
    echo "Please find additional useful information for configuration and in general stuff"
-   echo "1) Waywall config is at $HOME/.config/waywall, if you dont see it then check how to view hidden files in your file manager usually its ctrl+h as shortcut"
-   echo "2) Ninjabrainbot is already configured for green boat and godsesns , however you still need to configure your sensitivities guide here:"
+   echo "1)  You dont need to launch ninbot seperately , It will automatically launched by config inside of waywall , default key to show ninbot is Apostrophe'"
+   echo ""
+   echo "2)  Waywall config is at $HOME/.config/waywall, if you dont see it then check how to view hidden files in your file manager usually its ctrl+h as shortcut"
+   echo ""
+   echo "3) Ninjabrainbot is already configured for green boat and godsesns , however you still need to configure your sensitivities guide here:"
    echo "https://its-saanvi.github.io/linux-mcsr/minecraft/wayland/boat-eye.html"
-   echo "3) If you added plugins , they can be configured from individual plugin files  $HOME/.config/waywall/plugins"
+   echo ""
+   echo "4)  If you added plugins , they can be configured from individual plugin files  $HOME/.config/waywall/plugins"
 }
 function mainMenu {
    local menuChoice=""
