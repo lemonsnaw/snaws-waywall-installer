@@ -5,10 +5,13 @@ if [[ -n "${SUDO_USER:-}" || ${EUID:-$(id -u)} -eq 0 ]]; then
    exit 1
 fi
 
-SUPPORTED_OS=("fedora" "nobara")
+SUPPORTED_OS=("fedora" "nobara" "ubuntu" "debian") 
 declare -A SUPPORTED_VERSIONS
 SUPPORTED_VERSIONS["fedora"]="42 43 44"
 SUPPORTED_VERSIONS["nobara"]="42 43 44"
+SUPPORTED_VERSIONS["ubuntu"]="26.04"
+SUPPORTED_VERSIONS["debian"]="13"
+
 
 function append_log {
    if [[ $1 == "i" ]]; then
@@ -19,7 +22,6 @@ function append_log {
       echo "[UNKNOWN] $1" >> "$LOG_FILE"
    fi
 }
-
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 LOG_FILE="$SCRIPT_DIR/_setup.sh.log"
@@ -107,7 +109,13 @@ function osHandler {
             echo "Something went wrong while doing the setup for Fedora/Nobara."
             exit 1
          fi 
-
+         ;;
+      ubuntu | debian)
+         if ! ubuntuDebianHandler  ; then
+            append_log e "Ubuntu/Debian handler failed"
+            echo "Something went wrong while doing the setup for Ubuntu/Debian."
+            exit 1
+         fi 
          ;;
       *)
          echo "[ERROR] Unsupported OS: $OS_ID. Supported OS are: ${SUPPORTED_OS[*]}"
@@ -139,10 +147,14 @@ function flatpakPrismHandler {
    local flatpakBackupInstancesDir="$flatpakBackupDir/instances"
 
    if ! command -v flatpak >/dev/null 2>&1; then
+      echo "flatpak is not installed, skipping flatpak prism check"     
+      append_log i "flatpak is not installed, skipping flatpak prism check"
       return 0
    fi
 
    if ! flatpak info "$flatpakApp" >/dev/null 2>&1; then
+      echo "flatpak Prism is not installed, skipping flatpak prism check"
+      append_log i "flatpak Prism is not installed, skipping flatpak prism check"
       return 0
    fi
 
@@ -255,6 +267,51 @@ function javaHandlerFedoraNobara {
    echo "JDK installed Successfully"
 }
 
+function javaHandleAPTSystems {
+   sudo apt -y update
+   sudo apt -y install openjdk-21-jdk
+   if [[ $? -ne 0 ]]; then
+      append_log e "Failed to install openjdk-21-jdk"
+      echo "Failed to install openjdk-21-jdk, please install it manually and rerun the script"  
+      return 1
+   fi
+   append_log i "openjdk-21-jdk installed successfully"
+   sudo update-java-alternatives -s java-21-openjdk-amd64
+   if [[ $? -ne 0 ]]; then
+      append_log e "Failed to set java-21-openjdk-amd64 as default"
+      echo "Failed to set java-21-openjdk-amd64 as default, please set it manually and rerun the script"  
+      return 1
+   fi
+   append_log i "java-21-openjdk-amd64 set as default successfully"
+}
+
+function prismJavahandlerUbuntuDebian {
+   flatpakPrismHandler || return 1
+   title_print "Installing JDK and Prism Launcher (no user input required)"
+   javaHandleAPTSystems || return 1
+   sudo wget https://prism-launcher-for-debian.github.io/repo/prismlauncher.gpg -O /usr/share/keyrings/prismlauncher-archive-keyring.gpg \
+ && echo "Types: deb
+URIs: https://prism-launcher-for-debian.github.io/repo
+Suites: $(. /etc/os-release; echo "${UBUNTU_CODENAME:-${DEBIAN_CODENAME:-${VERSION_CODENAME}}}")
+Components: main
+Signed-By: /usr/share/keyrings/prismlauncher-archive-keyring.gpg" | sudo tee /etc/apt/sources.list.d/prismlauncher.sources \
+ && sudo apt -y update \
+ && sudo apt -y install prismlauncher
+   prismInstall=$?
+   if [[ $prismInstall -ne 0 ]]; then
+      echo "Failed to install prismlauncher"
+      append_log e "Failed to install prismlauncher"
+      exit 1
+   fi
+   append_log i "prismlauncher installed successfully"
+   echo "Installing libxkbcommon since its missing causing ninbot to show hotkeys"
+   append i "Installing libxkbcommon since its missing causing ninbot to show hotkeys"
+   sudo apt install libxkbcommon-x11-dev
+   if [[ $? -ne 0 ]]; then
+      echo "Failed to install libxkbcommon-x11-dev , package name might be different install manually to avoid issues with ninbot"
+      append_log e "Failed to install libxkbcommon-x11-dev package name might be different"
+   fi
+}
 
 function prismJavaHandlerFedoraNobara {
       
@@ -440,6 +497,62 @@ function fedoraNobaraHandler {
       exit 1
    fi
    waywallFedoraNobaraHandler
+}
+function ubuntuDebianHandler {
+   if ! prismJavahandlerUbuntuDebian; then
+      append_log e "Somethign went wrong while installing jdk and prism"
+      echo "Somethign went wrong while installing jdk and prism $LOG_FILE"
+      exit 1
+   fi
+     if ! prismInstanceHandler; then
+      append_log e "Prism instance configuration failed"
+      echo "Prism Instance configuration, please do the changes manually, waywall,ninbot installation will continue"
+      exit 1
+   fi
+   if ! ninbotHandler; then
+      append_log e "ninbot configuration failed for boateye please do it manually"
+      echo "ninbot configuration failed for boateye, please setup boateye, waywall installation will continue"
+      exit 1
+   fi
+   waywallUbuntuHandler
+}
+
+function waywallUbuntuHandler {
+   local waywallDebPath="$TMP_DIR/waywall.deb"
+    title_print "Waywall installation and configuration (No user input required)"
+   append_log i "Starting waywall installation and configuration"
+   if dpkg-query -W -f='${db:Status-Status}' waywall 2>/dev/null | grep -qx 'installed'; then
+      append_log i "Waywall is already installed, skipping installation"
+      if ! waywallinstalltionVerification; then
+         append_log e "Waywall installation verification failed"
+         echo "Failed to verify waywall installation"
+         exit 1
+      fi
+   else
+      append_log i "Waywall is not installed, proceeding with installation"
+      echo "Waywall is not installed, proceeding with installation"
+      append_log i "Downloading waywall.deb"
+
+      curl -fL -o "$waywallDebPath" "https://github.com/tesselslate/waywall/releases/download/0.2026.06.13/waywall_0.5-1_amd64.deb"
+      waywallDownload=$?
+      if [[ $waywallDownload -ne 0 ]]; then
+         append_log e "Failed to download waywall.deb"
+         exit 1
+      fi 
+      append_log i "waywall.deb downloaded successfully"
+      sudo apt -y install "$waywallDebPath"
+      waywallInstall=$?
+      if [[ $waywallInstall -ne 0 ]]; then
+         append_log e "Failed to install waywall.deb"
+         exit 1
+      fi
+      if ! waywallinstalltionVerification; then
+         append_log e "Waywall installation verification failed"
+         echo "Failed to verify waywall installation"
+         exit 1
+      fi
+   fi
+      echo "Waywall Installed and verified successfully"
 }
 function waywallFedoraNobaraHandler {
     local waywallRpmPath="$TMP_DIR/waywall.rpm"
