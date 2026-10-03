@@ -5,12 +5,13 @@ if [[ -n "${SUDO_USER:-}" || ${EUID:-$(id -u)} -eq 0 ]]; then
    exit 1
 fi
 
-SUPPORTED_OS=("fedora" "nobara" "ubuntu" "debian") 
+SUPPORTED_OS=("fedora" "nobara" "ubuntu" "debian" "arch") 
 declare -A SUPPORTED_VERSIONS
 SUPPORTED_VERSIONS["fedora"]="42 43 44"
 SUPPORTED_VERSIONS["nobara"]="42 43 44"
 SUPPORTED_VERSIONS["ubuntu"]="26.04"
 SUPPORTED_VERSIONS["debian"]="13"
+SUPPORTED_VERSIONS["arch"]="*"
 
 
 function append_log {
@@ -76,6 +77,12 @@ for os in "${SUPPORTED_OS[@]}"; do
    if [[ "$OS_ID" == "$os" ]]; then
       append_log i "Detected supported OS: $OS_ID"
       append_log i "Checking for supported version: $OS_VERSION"
+      if [[ "${SUPPORTED_VERSIONS[$os]}" == "*" ]]; then
+         is_supported_os=true
+         echo "Supported OS and version detected: $OS_ID $OS_VERSION"
+         append_log i "Supported OS and version detected: $OS_ID $OS_VERSION"
+         break
+      fi
       for version in ${SUPPORTED_VERSIONS[$os]}; do
          if [[ "$OS_VERSION" == "$version" ]]; then
             is_supported_os=true
@@ -117,6 +124,14 @@ function osHandler {
             exit 1
          fi 
          ;;
+      arch) 
+         if ! archBasedHandler ; then
+               append_log e "Arch handler failed"
+               echo "Something went wrong while doing the setup for Arch."
+               exit 1
+          fi 
+          ;;   
+         
       *)
          echo "[ERROR] Unsupported OS: $OS_ID. Supported OS are: ${SUPPORTED_OS[*]}"
          append_log e "Unsupported OS: $OS_ID. Supported OS are: ${SUPPORTED_OS[*]}"
@@ -287,6 +302,37 @@ function javaHandleAPTSystems {
    fi
    append_log i "java-21-openjdk-amd64 set as default successfully"
 }
+
+function javaHandlerArchBased {
+   sudo pacman -Sy --noconfirm jdk21-openjdk
+   if [[ $? -ne 0 ]]; then
+      append_log e "Failed to install jdk21-openjdk"
+      echo "Failed to install jdk21-openjdk, please install it manually and rerun the script"  
+      return 1
+   fi
+  append_log i "openjdk-21-jdk installed successfully"
+  sudo archlinux-java set java-21-openjdk
+ 
+   if [[ $? -ne 0 ]]; then
+      append_log e "Failed to set java-21-openjdk-amd64 as default"
+      echo "Failed to set java-21-openjdk-amd64 as default, please set it manually and rerun the script"  
+      return 1
+   fi
+   append_log i "java-21-openjdk-amd64 set as default successfully"
+}
+
+funciton prismJavaHandlerArchBased {
+   flatpakPrismHandler || return 1
+   title_print "Installing JDK and Prism Launcher (no user input required)"
+   javaHandlerArchBased || return 1
+   sudo pacman -Sy --noconfirm prismlauncher
+   if [[ $? -ne 0 ]]; then
+      append_log e "Failed to install prismlauncher"
+      echo "Failed to install prismlauncher, please install it manually and rerun the script"  
+      return 1
+   fi
+   append_log i "prismlauncher installed successfully"
+}  
 
 function prismJavahandlerUbuntuDebian {
    flatpakPrismHandler || return 1
@@ -539,6 +585,70 @@ function ubuntuDebianHandler {
    fi
    waywallUbuntuHandler
 }
+function archBasedHandler {
+   if ! command -v curl >/dev/null 2>&1; then
+         append_log e "curl is not installed,installing curl"
+         sudo pacman -Sy --noconfirm curl
+      fi
+   if ! command -v git >/dev/null 2>&1; then
+         append_log e "git is not installed,installing git"
+         sudo pacman -Sy --noconfirm git
+      fi
+   if ! prismJavaHandlerArchBased; then
+      append_log e "Somethign went wrong while installing jdk and prism"
+      echo "Somethign went wrong while installing jdk and prism $LOG_FILE"
+      exit 1
+   fi
+     if ! prismInstanceHandler; then
+      append_log e "Prism instance configuration failed"
+      echo "Prism Instance configuration, please do the changes manually, waywall,ninbot installation will continue"
+      exit 1
+   fi
+   if ! ninbotHandler; then
+      append_log e "ninbot configuration failed for boateye please do it manually"
+      echo "ninbot configuration failed for boateye, please setup boateye, waywall installation will continue"
+      exit 1
+   fi
+   waywallArchBasedHandler
+}
+
+function waywallArchBasedHandler{
+   local waywallpkgPath="$TMP_DIR/waywall.pkg.tar.zst"
+    title_print "Waywall installation and configuration (No user input required)"
+   append_log i "Starting waywall installation and configuration"
+   local isWaywallInstalled=$(pacman -Q | grep -ic waywall)
+   if [[ $isWaywallInstalled -gt 0 ]]; then
+      append_log i "Waywall is already installed, skipping installation"
+      if ! waywallinstalltionVerification; then
+         append_log e "Waywall installation verification failed"
+         echo "Failed to verify waywall installation"
+         exit 1
+      fi
+   else
+      append_log i "Waywall is not installed, proceeding with installation"
+      echo "Waywall is not installed, proceeding with installation"
+      append_log i "Downloading waywall.pkg.tar.zst"
+
+      curl -fL -o "$waywallpkgPath" "https://github.com/tesselslate/waywall/releases/download/0.2026.06.13/waywall-0.5-1-x86_64.pkg.tar.zst"
+      waywallDownload=$?
+      if [[ $waywallDownload -ne 0 ]]; then
+         append_log e "Failed to download waywall.pkg.tar.zst"
+         exit 1
+      fi 
+      append_log i "waywall.pkg.tar.zst downloaded successfully"
+      sudo pacman -U --noconfirm "$waywallpkgPath" 
+      if [[ $? -ne 0 ]]; then
+         append_log e "Failed to install waywall.pkg.tar.zst"
+         exit 1
+      fi
+      if ! waywallinstalltionVerification; then
+         append_log e "Waywall installation verification failed"
+         echo "Failed to verify waywall installation"
+         exit 1
+      fi
+   fi    
+   echo "Waywall Installed and verified successfully"
+}
 
 function waywallUbuntuHandler {
    local waywallDebPath="$TMP_DIR/waywall.deb"
@@ -582,7 +692,7 @@ function waywallFedoraNobaraHandler {
     local waywallRpmPath="$TMP_DIR/waywall.rpm"
     title_print "Waywall installation and configuration (No user input required)"
    append_log i "Starting waywall installation and configuration"
-   local isWaywallInstalled=$(dnf list installed waywall 2>/dev/null | grep -c waywall)
+   local isWaywallInstalled=$(dnf list installed waywall 2>/dev/null | grep -ic waywall)
    if [[ $isWaywallInstalled -eq 1 ]]; then
       append_log i "Waywall is already installed, skipping installation"
       if ! waywallinstalltionVerification; then
@@ -1069,3 +1179,5 @@ function mainMenu {
 }
 
 mainMenu
+echo ""
+echo "LOG GENERATED AT $LOG_FILE"
