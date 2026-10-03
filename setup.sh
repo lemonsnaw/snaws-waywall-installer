@@ -5,13 +5,14 @@ if [[ -n "${SUDO_USER:-}" || ${EUID:-$(id -u)} -eq 0 ]]; then
    exit 1
 fi
 
-SUPPORTED_OS=("fedora" "nobara" "ubuntu" "debian" "arch") 
+SUPPORTED_OS=("fedora" "nobara" "ubuntu" "debian" "arch" "cachyos") 
 declare -A SUPPORTED_VERSIONS
 SUPPORTED_VERSIONS["fedora"]="42 43 44"
 SUPPORTED_VERSIONS["nobara"]="42 43 44"
 SUPPORTED_VERSIONS["ubuntu"]="26.04"
 SUPPORTED_VERSIONS["debian"]="13"
 SUPPORTED_VERSIONS["arch"]="*"
+SUPPORTED_VERSIONS["cachyos"]="*"
 
 
 function append_log {
@@ -124,7 +125,7 @@ function osHandler {
             exit 1
          fi 
          ;;
-      arch) 
+      arch|cachyos) 
          if ! archBasedHandler ; then
                append_log e "Arch handler failed"
                echo "Something went wrong while doing the setup for Arch."
