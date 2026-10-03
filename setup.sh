@@ -309,7 +309,7 @@ Signed-By: /usr/share/keyrings/prismlauncher-archive-keyring.gpg" | sudo tee /et
    append_log i "prismlauncher installed successfully"
    echo "Installing libxkbcommon since its missing causing ninbot to show hotkeys"
    append i "Installing libxkbcommon since its missing causing ninbot to show hotkeys"
-   sudo apt install libxkbcommon-x11-dev
+   sudo apt -y install libxkbcommon-x11-dev
    if [[ $? -ne 0 ]]; then
       echo "Failed to install libxkbcommon-x11-dev , package name might be different install manually to avoid issues with ninbot"
       append_log e "Failed to install libxkbcommon-x11-dev package name might be different"
