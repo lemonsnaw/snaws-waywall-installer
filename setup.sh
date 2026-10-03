@@ -1145,6 +1145,7 @@ function additionalInforForUser {
    echo "2)  Waywall config is at $HOME/.config/waywall, if you dont see it then check how to view hidden files in your file manager usually its ctrl+h as shortcut"
    echo ""
    echo "3) Ninjabrainbot is already configured for green boat and godsesns , however you still need to configure your sensitivities guide here:"
+   echo ""
    echo "https://its-saanvi.github.io/linux-mcsr/minecraft/wayland/boat-eye.html"
    echo ""
    echo "4)  If you added plugins , they can be configured from individual plugin files  $HOME/.config/waywall/plugins"

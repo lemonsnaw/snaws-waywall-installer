@@ -39,9 +39,61 @@ Currently Added plugins:
 - Oneshot crosshair (https://github.com/lemonsnaw/ww_oneshot_crosshair)
 
 ## Current development plans:
-- Port Arch and archbased distro
-- Bazzite Support(?)
+- Bazzite Supports
 - Plugins URI support ( to add plugins which are not hardcoded) in plugins folder.
+
+## Adding new distro
+1. Adding new distro should be done like this:
+
+    Add new entry in supported os and version supported. 
+
+    Use `*` if all versions are supported or rolling updates distro. 
+
+    `SUPPORTED_OS` uses ID from `/etc/os-releases` ,command: `grep ^ID= /etc/os-release | cut -d "=" -f 2`
+
+
+    `SUPPORT_VERSION` is dictionary entry  for SUPPORTED_OS with version supported by script. Use `*` for all/Rolling update based distro otherwise will be `VERSION_ID`
+    from `/etc/os-releases`, 
+    command: `grep '^VERSION_ID=' /etc/os-release | cut -d '=' -f 2 | tr -d '"'`
+
+    ```bash
+    SUPPORTED_OS=("fedora" "nobara" "ubuntu" "debian" "arch" "cachyos") 
+    declare -A SUPPORTED_VERSIONS
+    SUPPORTED_VERSIONS["fedora"]="42 43 44"
+    SUPPORTED_VERSIONS["nobara"]="42 43 44"
+    SUPPORTED_VERSIONS["ubuntu"]="26.04"
+    SUPPORTED_VERSIONS["debian"]="13"
+    SUPPORTED_VERSIONS["arch"]="*"
+    SUPPORTED_VERSIONS["cachyos"]="*"
+    ```
+2. Add the code for the distro if its already not supported
+
+3. Add entry in `osHandler` for the new distro or derivates
+    ```bash
+    function osHandler {
+    case  "$OS_ID" in
+        fedora|nobara)
+            if ! fedoraNobaraHandler; then
+                append_log e "Fedora/Nobara handler failed"
+                echo "Something went wrong while doing the setup for Fedora/Nobara."
+                exit 1
+            fi 
+            ;;
+        ubuntu | debian)
+            if ! ubuntuDebianHandler  ; then
+                append_log e "Ubuntu/Debian handler failed"
+                echo "Something went wrong while doing the setup for Ubuntu/Debian."
+                exit 1
+            fi 
+            ;;
+        arch|cachyos) 
+            if ! archBasedHandler ; then
+                append_log e "Arch handler failed"
+                echo "Something went wrong while doing the setup for Arch."
+                exit 1
+            fi 
+            ;; 
+    ```
 
 
 ## Thanks!
