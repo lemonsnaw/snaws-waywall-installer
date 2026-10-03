@@ -486,6 +486,10 @@ function fedoraNobaraHandler {
          append_log e "curl is not installed,installing curl"
          sudo dnf -y install curl
       fi
+      if ! command -v git >/dev/null 2>&1; then
+         append_log e "git is not installed,installing git"
+         sudo dnf -y install git
+      fi
    if ! prismJavaHandlerFedoraNobara; then
       append_log e "Somethign went wrong while installing jdk and prism"
       echo "Somethign went wrong while installing jdk and prism $LOG_FILE"
@@ -508,6 +512,10 @@ function ubuntuDebianHandler {
    if ! command -v curl >/dev/null 2>&1; then
          append_log e "curl is not installed,installing curl"
          sudo apt -y install curl
+      fi
+   if ! command -v git >/dev/null 2>&1; then
+         append_log e "git is not installed,installing git"
+         sudo apt -y install git
       fi
    if ! prismJavahandlerUbuntuDebian; then
       append_log e "Somethign went wrong while installing jdk and prism"
@@ -691,13 +699,6 @@ function genericConfigHandler {
       append_log i "Existing waywall config backed up to $HOME/.config/waywall.bkp$count"
    fi
 
-   sudo dnf -y install git
-   didGitInstall=$?
-   if [[ $didGitInstall -ne 0 ]]; then
-      append_log e "Failed to install git"
-      exit 1
-   fi
-   append_log i "git installed successfully"
    local waywallConfigChoice="0"
    while true; do
       read -p "what resolution are you using 1080p(default/0) or 1440p(1)? [0/1]: " waywallConfigChoice
