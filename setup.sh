@@ -159,6 +159,7 @@ function flatpakPrismHandler {
    fi
 
    echo "flatpak Prism doesnt work with waywall it will be uninstalled and instances folder will be backed up in same folder where this script is running at $flatpakBackupDir"
+   echo ""
    read -r -n 1 -s -p "Press any key to continue..."
    echo
 
@@ -385,11 +386,13 @@ function prismInstanceHandler {
       title_print "Prism Launcher Ranked Instance Setup (User Input Required)"
       while true; do
 
+      echo ""
       read -p "Do you want to import MCSR Ranked Pack for Prism Launcher? type n if you are already have configured instance , you will be asked for path in next section [y/n] :" prismInstanceChoice
       prismInstanceChoice=$(to_lowercase "$prismInstanceChoice")
       case "$prismInstanceChoice" in
          y|yes)
-               
+
+               echo ""
                read -r -n 1 -s -p "Script will open the MCSR Ranked pack in Prism Launcher, accept and press ok and launch the instance. Press any key to continue..."
                echo
                append_log i "Opening Prism Launcher to import MCSR Ranked modpack"
@@ -417,7 +420,8 @@ function prismInstanceHandler {
    echo "Complete the import and launch the instance once, then enter its path below."
    echo "example path: /home/snaw/.local/share/PrismLauncher/instances/MCSRRanked-Linux-1.16.1-Basic-w-SS"
    while true; do
-      read -p "Enter path:" rankedinstancepath
+     echo ""
+     read -p "Enter path:" rankedinstancepath
       if [[ -d "$rankedinstancepath" ]] && [[ -f "$rankedinstancepath/instance.cfg" ]]; then
          append_log i "Ranked instance path is valid and instance file is present: $rankedinstancepath"
          break
@@ -433,6 +437,7 @@ function prismInstanceHandler {
 
    title_print "Prism waywall configuration in progress"
    append_log i "Configuring prism to use waywall"
+   echo ""
    read -p "Prism launcher and minecraft instance has to closed to write to config , please press any key to continue it will be automically closed if it is open:"
 
    append_log i "Closing prism launcher if it is open"
@@ -651,7 +656,8 @@ function askUseGenericConfig {
    local confirmDenial=""
 
    while true; do
-      read -p "Do you want to use Generic Config by Gore? [y/n]: " genericChoice
+     echo ""
+     read -p "Do you want to use Generic Config by Gore? [y/n]: " genericChoice
       genericChoice=$(to_lowercase "$genericChoice")
 
       case "$genericChoice" in
@@ -660,6 +666,7 @@ function askUseGenericConfig {
             ;;
          n|no)
             while true; do
+               echo ""
                read -p "Generic config is recommended for most people. Please confirm that you DONT want to use generic config and will be configuring manually? [y/n]: " confirmDenial
                confirmDenial=$(to_lowercase "$confirmDenial")
 
@@ -685,11 +692,15 @@ function askUseGenericConfig {
 
 
 function genericConfigHandler {
+
    append_log i "Backing up existing waywall config if present"
    append_log i "Starting waywall configuration (using generic config)"
    append_log i "Using target user: $TARGET_USER at $HOME"
 
    if [[ -d "$HOME/.config/waywall" ]]; then
+      echo ""
+      read -r -p -n 1 "Existing config found it will be backed up at $HOME/.config/waywall.bkp<number> , please press any key to continue" confirmBackup
+      echo ""
       append_log i "Existing waywall config found, backing up to $HOME/.config/waywall.bkp"
       count=1
       while [[ -d "$HOME/.config/waywall.bkp$count" ]]; do
@@ -701,6 +712,7 @@ function genericConfigHandler {
 
    local waywallConfigChoice="0"
    while true; do
+      echo ""
       read -p "what resolution are you using 1080p(default/0) or 1440p(1)? [0/1]: " waywallConfigChoice
       case "$waywallConfigChoice" in
          0)
@@ -780,6 +792,7 @@ function plugWaywallHandler {
       echo "You can copy them back from the backup directory after setup."
 
       while true; do
+         echo ""
          read -r -p "Create a backup of the existing plugins(no new plugins will be instlaled if cancelled)? [y/n]: " confirmplugwaywall
          case "$(to_lowercase "$confirmplugwaywall")" in
             y|yes)
@@ -929,6 +942,7 @@ function genericConfigAddonsHandler {
       echo "This script is intended to be used with generic config by gore"
       echo "PLEASE DO NOT USE IT IN CASE YOU ARE NOT USING GENERIC CONFIG"
 
+      echo ""
       read -p "Do you want to continue [y/n]: " genericConfigConfirmation
       case "$(to_lowercase "$genericConfigConfirmation")" in
          y|yes)
@@ -964,6 +978,7 @@ function genericConfigAddonsHandler {
    done
 
    while true; do
+      echo ""
       read -r -p "Enter addon numbers separated by spaces(1 2 3) or commas(1,2,3) or * for all: " addonChoice
       addonChoice=${addonChoice//,/ }
       selectedGenericAddons=()
@@ -1010,7 +1025,13 @@ function genericConfigAddonsHandler {
    echo "Selected addons: ${!selectedGenericAddons[*]}"
    title_print "Plugin Addons Setup Complete"
 }
-
+function additionalInforForUser {
+   echo "Please find additional useful information for configuration and in general stuff"
+   echo "1) Waywall config is at $HOME/.config/waywall, if you dont see it then check how to view hidden files in your file manager usually its ctrl+h as shortcut"
+   echo "2) Ninjabrainbot is already configured for green boat and godsesns , however you still need to configure your sensitivities guide here:"
+   echo "https://its-saanvi.github.io/linux-mcsr/minecraft/wayland/boat-eye.html"
+   echo "3) If you added plugins , they can be configured from individual plugin files  $HOME/.config/waywall/plugins"
+}
 function mainMenu {
    local menuChoice=""
 
@@ -1019,6 +1040,7 @@ function mainMenu {
       echo "1) Waywall and Prism setup"
       echo "2) Generic config plugins using plug.waywall"
       echo "q) Quit"
+      echo ""
       read -r -p "Choose an option: " menuChoice
 
       case "$(to_lowercase "$menuChoice")" in
@@ -1026,6 +1048,8 @@ function mainMenu {
             osHandler || return 1
             waywallConfigHandler || return 1
             title_print "Waywall and Prism Setup Complete"
+            echo
+            additionalInforForUser
             return 0
             ;;
          2)
