@@ -3,9 +3,14 @@
 ## Disclaimer
 This script is provided as-is, without warranty. It will install system packages, changes configurations to limited scope as well, **will** uninstall Flatpak Prism launcher (backup is taken at runtime) and I am putting decent amount of measures to have your configs backed up before doing any operations still taking backup is highly recommended, I will not be responsible in case any issues arise with system after running it.
 
+## Supported OS
+- Fedora/Nobara (42,43,44+)
+- Ubuntu 26.01+
+- Debian 13+
+
 ## Purpose
 This is script does following:
-- Download and setup default JDK for Fedora/Nobara to avoid issue related to headless JDK
+- Download and setup default JDK to avoid issue related to headless JDK
 - Download and install Prism launcher (removes flatpak prism after taking backup and skips if already installed)
 - Downloads and install waywall (skips if already installed)
 - Downloads [Gores Generic Config](https://github.com/arjuncgore/waywall_config) sets it up for waywall.
@@ -33,7 +38,7 @@ Currently Added plugins:
 - Oneshot crosshair (https://github.com/lemonsnaw/ww_oneshot_crosshair)
 
 ## Current development plans:
-- Port for debian/Arch distro
+- Port Arch and archbased distro
 - Bazzite Support(?)
 - Plugins URI support ( to add plugins which are not hardcoded) in plugins folder.
 
