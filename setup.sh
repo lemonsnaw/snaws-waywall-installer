@@ -277,7 +277,7 @@ function javaHandleAPTSystems {
    fi
    append_log i "openjdk-21-jdk installed successfully"
    # idk why update-java-alternatives doesnt work , I will debug later
-   sudo update-alternatives --set java /usr/lib/nvm/java-21-openjdk-amd64/bin/java
+   sudo update-alternatives --set java /usr/lib/jvm/java-21-openjdk-amd64/bin/java
  
    if [[ $? -ne 0 ]]; then
       append_log e "Failed to set java-21-openjdk-amd64 as default"
