@@ -503,11 +503,11 @@ function prismInstanceHandler {
    else
       append_log i "Prism launcher is not open, proceeding with configuration"
    fi
-
+   isNvidia=$(lspci | grep -E "VGA|3D" | grep -i nvidia >/dev/null 2>&1; echo $?)
    prismConfigFile="$rankedinstancepath/instance.cfg"
    if [[ -f "$prismConfigFile" ]]; then
       append_log i "prism config file found at $prismConfigFile"
-      awk '
+      awk -v isNvidia="$isNvidia" '
          /^\[General\]/ {
             print
             print "OverrideCommands=true"
@@ -516,6 +516,10 @@ function prismInstanceHandler {
             print "IgnoreJavaCompatibility=true"
             print "UseNativeGLFW=true"
             print "WrapperCommand=waywall wrap --"
+            if (isNvidia == 0) {
+               print "OverrideEnv=true"
+               print "Env={\\\"__GL_THREADED_OPTIMIZATIONS\\\":\\\"0\\\"}"
+            }  
             next
          }
          { print }
