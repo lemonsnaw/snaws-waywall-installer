@@ -1154,6 +1154,29 @@ function additionalInforForUser {
    echo ""
    echo "4)  If you added plugins , they can be configured from individual plugin files  $HOME/.config/waywall/plugins"
 }
+
+function dragClickHandler {
+   sudo mkdir -p /etc/libinput
+   if [[ $? -ne 0 ]]; then
+      echo "[ERROR] Something went wrong while doing the dragclicking setup , do it manully https://its-saanvi.github.io/linux-mcsr/drag-clicking.html"
+      exit 1
+   fi
+   sudo touch /etc/libinput/local-overrides.quirks
+   if [[ -f /etc/libinput/local-overrides.quirks ]]; then
+      sudo tee /etc/libinput/local-overrides.quirks >/dev/null <<EOF
+[Never Debounce]
+MatchUdevType=mouse
+ModelBouncingKeys=1
+EOF
+fi
+
+if [[ $? -ne 0 ]]; then
+   echo "Something went Wrong do it manully,https://its-saanvi.github.io/linux-mcsr/drag-clicking.html"
+fi
+
+echo "Drag clicking setup is done , Please RESTART for it to take in effect"
+}
+
 function mainMenu {
    local menuChoice=""
 
@@ -1161,6 +1184,7 @@ function mainMenu {
       title_print "Snaws Waywall Setup"
       echo "1) Waywall and Prism setup"
       echo "2) Generic config plugins using plug.waywall"
+      echo "3) Drag click support"
       echo "q) Quit"
       echo ""
       read -r -p "Choose an option: " menuChoice
@@ -1178,6 +1202,10 @@ function mainMenu {
             genericConfigAddonsHandler || return 1
             return 0
             ;;
+         3)
+            dragClickHandler || return 1
+            return 0
+            ;;
          q|quit)
             echo "Exiting."
             return 0
@@ -1190,5 +1218,3 @@ function mainMenu {
 }
 
 mainMenu
-echo ""
-echo "LOG GENERATED AT $LOG_FILE"
