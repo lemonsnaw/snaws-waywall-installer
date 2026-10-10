@@ -131,7 +131,9 @@ function osHandler {
                echo "Something went wrong while doing the setup for Arch."
                exit 1
           fi 
-          ;;   
+          ;;
+      bazzite)
+
          
       *)
          echo "[ERROR] Unsupported OS: $OS_ID. Supported OS are: ${SUPPORTED_OS[*]}"
@@ -305,7 +307,7 @@ function javaHandleAPTSystems {
 }
 
 function javaHandlerArchBased {
-   sudo pacman -Sy --noconfirm jdk21-openjdk
+   sudo pacman -Syu --noconfirm jdk21-openjdk
    if [[ $? -ne 0 ]]; then
       append_log e "Failed to install jdk21-openjdk"
       echo "Failed to install jdk21-openjdk, please install it manually and rerun the script"  
@@ -326,7 +328,7 @@ function prismJavaHandlerArchBased {
    flatpakPrismHandler || return 1
    title_print "Installing JDK and Prism Launcher (no user input required)"
    javaHandlerArchBased || return 1
-   sudo pacman -Sy --noconfirm prismlauncher
+   sudo pacman -Syu --noconfirm prismlauncher
    if [[ $? -ne 0 ]]; then
       append_log e "Failed to install prismlauncher"
       echo "Failed to install prismlauncher, please install it manually and rerun the script"  
@@ -594,11 +596,11 @@ function archBasedHandler {
 
    if ! pacman -Q curl >/dev/null 2>&1; then
          append_log e "curl is not installed,installing curl"
-         sudo pacman -Sy --noconfirm curl
+         sudo pacman -Syu --noconfirm curl
       fi
    if ! pacman -Q git >/dev/null 2>&1; then
          append_log e "git is not installed,installing git"
-         sudo pacman -Sy --noconfirm git
+         sudo pacman -Syu --noconfirm git
       fi
    if ! prismJavaHandlerArchBased; then
       append_log e "Somethign went wrong while installing jdk and prism"
@@ -1177,6 +1179,16 @@ fi
 echo "Drag clicking setup is done , Please RESTART for it to take in effect"
 }
 
+function bazziteHandler {
+      if ! command -v curl >/dev/null 2>&1; then
+         append_log e "curl is not installed,installing curl"
+         sudo rpm-ostree
+      fi
+      if ! command -v git >/dev/null 2>&1; then
+         append_log e "git is not installed,installing git"
+         sudo dnf -y install git
+      fi
+}
 function mainMenu {
    local menuChoice=""
 
