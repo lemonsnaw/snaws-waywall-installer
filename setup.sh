@@ -5,7 +5,7 @@ if [[ -n "${SUDO_USER:-}" || ${EUID:-$(id -u)} -eq 0 ]]; then
    exit 1
 fi
 
-SUPPORTED_OS=("fedora" "nobara" "ubuntu" "debian" "arch" "cachyos") 
+SUPPORTED_OS=("fedora" "nobara" "ubuntu" "debian" "arch" "cachyos" "bazzite")
 declare -A SUPPORTED_VERSIONS
 SUPPORTED_VERSIONS["fedora"]="42 43 44"
 SUPPORTED_VERSIONS["nobara"]="42 43 44"
@@ -13,6 +13,7 @@ SUPPORTED_VERSIONS["ubuntu"]="26.04"
 SUPPORTED_VERSIONS["debian"]="13"
 SUPPORTED_VERSIONS["arch"]="*"
 SUPPORTED_VERSIONS["cachyos"]="*"
+SUPPORTED_VERSIONS["bazzite"]="42 43 44"
 
 
 function append_log {
@@ -27,11 +28,10 @@ function append_log {
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 LOG_FILE="$SCRIPT_DIR/_setup.sh.log"
-NINBOT_GREENBOAT_GODSENS_XMLURI="https://raw.githubusercontent.com/lemonsnaw/snaws-waywall-installer/refs/heads/main/prefs.xml"
 
 TMP_DIR="/tmp/snawswaywallinstaller"
 mkdir -p "$TMP_DIR"
-rm -f "$TMP_DIR/waywall.rpm" "$TMP_DIR/waywall.deb" "$TMP_DIR/prefs.xml" "$TMP_DIR/prism-instance.cfg.tmp"
+rm -f "$TMP_DIR/waywall.rpm" "$TMP_DIR/waywall.deb" "$TMP_DIR/prism-instance.cfg.tmp"
 
 if [[ ! -f "$LOG_FILE" ]]; then
    echo "Creating log file"
@@ -133,8 +133,12 @@ function osHandler {
           fi 
           ;;
       bazzite)
-
-         
+         if ! bazziteHandler; then
+            append_log e "Bazzite handler failed"
+            echo "Something went wrong while doing the setup for Bazzite."
+            exit 1
+         fi
+         ;;
       *)
          echo "[ERROR] Unsupported OS: $OS_ID. Supported OS are: ${SUPPORTED_OS[*]}"
          append_log e "Unsupported OS: $OS_ID. Supported OS are: ${SUPPORTED_OS[*]}"
@@ -387,7 +391,8 @@ function prismJavaHandlerFedoraNobara {
       append_log i "prismlauncher installed successfully"
 }
 function ninbotHandler {
-   local downloadedPrefsFile="$TMP_DIR/prefs.xml"
+   local prefsFile="$HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
+   local prefsTempFile="$prefsFile.tmp"
    if [[ ! -d "$HOME/.java/.userPrefs/ninjabrainbot" ]]; then
       mkdir -p "$HOME/.java/.userPrefs/ninjabrainbot"
       if [[ $? -ne 0 ]]; then
@@ -398,34 +403,48 @@ function ninbotHandler {
       fi
    fi
 
-   if [[ -f "$HOME/.java/.userPrefs/ninjabrainbot/prefs.xml" ]]; then
-      append_log i "prefs.xml already exists at $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml, skipping modifications to it"
+   if [[ -f "$prefsFile" ]]; then
+      append_log i "prefs.xml already exists at $prefsFile, skipping modifications to it"
    else
-      if [[ -f "$downloadedPrefsFile" ]]; then
-         append_log i "prefs.xml found in $downloadedPrefsFile, copying to $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
-         cp "$downloadedPrefsFile" "$HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
-         if [[ $? -ne 0 ]]; then
-            append_log e "Failed to copy prefs.xml to $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
-            return 1
-         else
-            append_log i "Copied prefs.xml to $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
-         fi
+      append_log i "Writing default prefs.xml directly to $prefsFile"
+      if ! cat > "$prefsTempFile" <<'EOF'
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE map SYSTEM "http://java.sun.com/dtd/preferences.dtd">
+<map MAP_XML_VERSION="1.0">
+  <entry key="alt_clipboard_reader" value="false"/>
+  <entry key="angle_adjustment_display_type" value="1"/>
+  <entry key="angle_adjustment_type" value="1"/>
+  <entry key="default_boat_type" value="2"/>
+  <entry key="language_v2" value="en-US"/>
+  <entry key="resolution_height" value="16384.0"/>
+  <entry key="sensitivity" value="0.02291165"/>
+  <entry key="settings_version" value="3"/>
+  <entry key="sigma_boat" value="7.0E-4"/>
+  <entry key="use_precise_angle" value="true"/>
+  <entry key="color_negative_coords" value="true"/>
+  <entry key="window_x" value="800"/>
+  <entry key="window_y" value="465"/>
+  <entry key="size" value="1"/>
+  <entry key="view" value="1"/>
+</map>
+EOF
+      then
+         append_log e "Failed to write temporary prefs.xml at $prefsTempFile"
+         rm -f "$prefsTempFile"
+         return 1
+      fi
+
+      if ! mv -n "$prefsTempFile" "$prefsFile"; then
+         append_log e "Failed to install prefs.xml at $prefsFile"
+         rm -f "$prefsTempFile"
+         return 1
+      fi
+
+      if [[ -f "$prefsTempFile" ]]; then
+         rm -f "$prefsTempFile"
+         append_log i "prefs.xml already exists at $prefsFile, kept existing file"
       else
-         append_log i "prefs.xml not found in $TMP_DIR, downloading from $NINBOT_GREENBOAT_GODSENS_XMLURI"
-         curl -fL -o "$downloadedPrefsFile" "$NINBOT_GREENBOAT_GODSENS_XMLURI"
-         if [[ $? -ne 0 ]]; then
-            append_log e "Failed to download prefs.xml from $NINBOT_GREENBOAT_GODSENS_XMLURI"
-            return 1
-         else
-            append_log i "Downloaded prefs.xml from $NINBOT_GREENBOAT_GODSENS_XMLURI"
-            cp "$downloadedPrefsFile" "$HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
-            if [[ $? -ne 0 ]]; then
-               append_log e "Failed to copyConfiguration downloaded prefs.xml to $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
-               return 1
-            else
-               append_log i "Copied downloaded prefs.xml to $HOME/.java/.userPrefs/ninjabrainbot/prefs.xml"
-            fi
-         fi
+         append_log i "Created prefs.xml at $prefsFile"
       fi
    fi
    return 0
@@ -521,11 +540,11 @@ function prismInstanceHandler {
             if (isNvidia == 0) {
                print "OverrideEnv=true"
                print "Env={\\\"__GL_THREADED_OPTIMIZATIONS\\\":\\\"0\\\"}"
-            }  
+            }
             next
          }
          { print }
-         ' "$prismConfigFile" > "$prismTempConfig" && mv -f "$prismTempConfig" "$prismConfigFile"
+      ' "$prismConfigFile" > "$prismTempConfig" && mv -f "$prismTempConfig" "$prismConfigFile"
       if [[ $? -ne 0 ]]; then
          append_log e "Failed to update prism config file at $prismConfigFile"
          echo "Failed to update prism config file at $prismConfigFile, please manually add glfw path and wrapper command"
@@ -539,6 +558,129 @@ function prismInstanceHandler {
    fi
    return 0
 }
+
+function prismInstanceHandlerBazzite {
+   local prismAppImage="$HOME/mcsr/PrismLauncher.AppImage"
+
+   title_print "Prism Launcher Ranked Instance Setup (User Input Required)"
+   while true; do
+      echo ""
+      read -p "Do you want to import MCSR Ranked Pack for Prism Launcher? type n if you are already have configured instance , you will be asked for path in next section [y/n] :" prismInstanceChoice
+      prismInstanceChoice=$(to_lowercase "$prismInstanceChoice")
+      case "$prismInstanceChoice" in
+         y|yes)
+            echo ""
+            read -r -n 1 -s -p "Script will open the MCSR Ranked pack in Prism Launcher, accept and press ok and launch the instance. Press any key to continue..."
+            echo
+            append_log i "Opening Prism Launcher to import MCSR Ranked modpack"
+            "$prismAppImage" --import "$MCSR_RANKED_PACK_URL" >/dev/null 2>&1 &
+            prismImportPid=$!
+            if [[ $? -ne 0 ]]; then
+               append_log e "Failed import mcsr ranked isntance "
+               echo "Failed to start prism launcher."
+               return 1
+            fi
+            append_log i "Started Prism Launcher for MCSR Ranked import (PID $prismImportPid)"
+            echo "Prism Launcher started in the background (PID $prismImportPid)."
+            break
+            ;;
+         n|no)
+            break
+            ;;
+         *)
+            echo "Invalid choice. Please type y for yes or n for no(you already have mcsr ranked instance setup)."
+            ;;
+      esac
+   done
+
+   title_print "Ranked Instance Path Setup (User Input Required)"
+   echo "Complete the import and launch the instance once, then enter its path below."
+   echo "example path: /home/snaw/.local/share/PrismLauncher/instances/MCSRRanked-Linux-1.16.1-Basic-w-SS"
+   while true; do
+      echo ""
+      read -r -p "Enter path:" rankedinstancepath
+      if [[ -d "$rankedinstancepath" ]] && [[ -f "$rankedinstancepath/instance.cfg" ]]; then
+         append_log i "Ranked instance path is valid and instance file is present: $rankedinstancepath"
+         break
+      fi
+      append_log e "Ranked instance path is invalid: $rankedinstancepath"
+      echo ""
+      echo ""
+      echo "Ranked instance path is invalid, please try again or ctrl+c to exit"
+   done
+
+   TARGET_USER="${SUDO_USER:-$(whoami)}"
+   title_print "Prism waywall configuration in progress"
+   append_log i "Configuring prism to use waywall"
+   echo ""
+   read -r -p "Prism launcher and minecraft instance has to closed to write to config , please press any key to continue it will be automically closed if it is open:"
+
+   append_log i "Closing prism launcher if it is open"
+   prismids="$(ps -e | grep -c prismlauncher)"
+   if [[ $prismids -gt 0 ]]; then
+      append_log i "Prism launcher is open, closing it"
+      # I checked that killing prism it does kill minecraft instances so I am keeping it that way
+      # here minecraft instances are also killed
+      pkill -f prismlauncher
+      if [[ $? -ne 0 ]]; then
+         append_log e "Failed to close prism launcher"
+         return 1
+      fi
+      append_log i "Prism launcher closed successfully"
+   else
+      append_log i "Prism launcher is not open, proceeding with configuration"
+   fi
+
+   if ! prismConfigHandlerBazzite "$rankedinstancepath/instance.cfg"; then
+      return 1
+   fi
+   return 0
+}
+
+function prismConfigHandlerBazzite {
+   local prismConfigFile="$1"
+   local prismTempConfig="$TMP_DIR/prism-instance.cfg.tmp"
+   local waywallBinary="$HOME/mcsr/waywall/usr/bin/waywall"
+   local waywallGLFW="$HOME/mcsr/waywall/usr/local/lib64/waywall-glfw/libglfw.so"
+   local javaBinary="$HOME/mcsr/java-21/bin/java"
+   local isNvidia
+
+   if [[ ! -f "$prismConfigFile" ]]; then
+      append_log e "Prism config file not found at $prismConfigFile"
+      return 1
+   fi
+
+   isNvidia=$(lspci | grep -E "VGA|3D" | grep -i nvidia >/dev/null 2>&1; echo $?)
+   append_log i "Prism config file found at $prismConfigFile"
+   awk -v isNvidia="$isNvidia" -v waywallBinary="$waywallBinary" -v waywallGLFW="$waywallGLFW" -v javaBinary="$javaBinary" '
+      /^\[General\]/ {
+         print
+         print "OverrideCommands=true"
+         print "OverrideNativeWorkarounds=true"
+         print "CustomGLFWPath=" waywallGLFW
+         print "OverrideJavaLocation=true"
+         print "JavaPath=" javaBinary
+         print "IgnoreJavaCompatibility=true"
+         print "UseNativeGLFW=true"
+         print "WrapperCommand=" waywallBinary " wrap --"
+         if (isNvidia == 0) {
+            print "OverrideEnv=true"
+            print "Env={\\\"__GL_THREADED_OPTIMIZATIONS\\\":\\\"0\\\"}"
+         }
+         next
+      }
+      { print }
+   ' "$prismConfigFile" > "$prismTempConfig" && mv -f "$prismTempConfig" "$prismConfigFile"
+   if [[ $? -ne 0 ]]; then
+      append_log e "Failed to update Prism config file at $prismConfigFile"
+      echo "Failed to update Prism config file at $prismConfigFile, please manually add the GLFW path and wrapper command"
+      return 1
+   fi
+
+   append_log i "Prism config file updated successfully at $prismConfigFile"
+   append_log i "Prism config permissions: $(ls -l "$prismConfigFile")"
+}
+
 function fedoraNobaraHandler {
      if ! command -v curl >/dev/null 2>&1; then
          append_log e "curl is not installed,installing curl"
@@ -818,7 +960,7 @@ function genericConfigHandler {
 
    if [[ -d "$HOME/.config/waywall" ]]; then
       echo ""
-      read -r -p -n 1 "Existing config found it will be backed up at $HOME/.config/waywall.bkp<number> , please press any key to continue" confirmBackup
+      read -r -n 1 -p "Existing config found it will be backed up at $HOME/.config/waywall.bkp<number> , please press any key to continue" confirmBackup
       echo ""
       append_log i "Existing waywall config found, backing up to $HOME/.config/waywall.bkp"
       count=1
@@ -1146,7 +1288,7 @@ function genericConfigAddonsHandler {
 }
 function additionalInforForUser {
    echo "Please find additional useful information for configuration and in general stuff"
-   echo "1)  You dont need to launch ninbot seperately , It will automatically launched by config inside of waywall , default key to show ninbot is Apostrophe'"
+   echo ")  You dont need to launch ninbot seperately , It will automatically launched by config inside of waywall , default key to show ninbot is Apostrophe'"
    echo ""
    echo "2)  Waywall config is at $HOME/.config/waywall, if you dont see it then check how to view hidden files in your file manager usually its ctrl+h as shortcut"
    echo ""
@@ -1155,6 +1297,14 @@ function additionalInforForUser {
    echo "https://its-saanvi.github.io/linux-mcsr/minecraft/wayland/boat-eye.html"
    echo ""
    echo "4)  If you added plugins , they can be configured from individual plugin files  $HOME/.config/waywall/plugins"
+
+   if [[ "$OS_ID" == "bazzite" ]]; then
+      echo ""
+      echo "Bazzite-specific information:"
+      echo "5) Prism Launcher AppImage is at $HOME/mcsr/PrismLauncher.AppImage and it should be available as .desktop file is automaticaly created"
+      echo "6) Waywall was extracted to $HOME/mcsr/waywall "
+      echo "7) JDK is also located at $HOME/mcsr/java-21"
+   fi
 }
 
 function dragClickHandler {
@@ -1180,14 +1330,189 @@ echo "Drag clicking setup is done , Please RESTART for it to take in effect"
 }
 
 function bazziteHandler {
+      local mcsrDir="$HOME/mcsr"
+
+      if ! mkdir -p "$mcsrDir"; then
+         append_log e "Failed to create Bazzite install directory: $mcsrDir"
+         return 1
+      fi
+
       if ! command -v curl >/dev/null 2>&1; then
          append_log e "curl is not installed,installing curl"
-         sudo rpm-ostree
+         sudo rpm-ostree install --idempotent -y curl
+         if [[ $? -ne 0 ]]; then
+            append_log e "Failed to install curl on Bazzite"
+            return 1
+         fi
       fi
       if ! command -v git >/dev/null 2>&1; then
          append_log e "git is not installed,installing git"
-         sudo dnf -y install git
+         sudo rpm-ostree install --idempotent -y git
+         if [[ $? -ne 0 ]]; then
+            append_log e "Failed to install git on Bazzite"
+            return 1
+         fi
       fi
+      if ! prismJavaHandlerBazzite; then
+         return 1
+      fi
+      if ! prismInstanceHandlerBazzite; then
+         return 1
+      fi
+      if ! ninbotHandler; then
+         append_log e "Ninjabrainbot configuration failed on Bazzite"
+         echo "Ninjabrainbot configuration failed on Bazzite; please configure it manually."
+         return 1
+      fi
+      if ! waywallBazziteHandler; then
+         return 1
+      fi
+}
+
+function javaHandlerBazzite {
+   local mcsrDir="$HOME/mcsr"
+   local jdkArchivePath="$mcsrDir/adoptium-jdk.tar.gz"
+   local jdkInstallDir="$mcsrDir/java-21"
+
+   if ! mkdir -p "$mcsrDir"; then
+      append_log e "Failed to create Bazzite install directory: $mcsrDir"
+      return 1
+   fi
+
+   if ! curl -fL -o "$jdkArchivePath" "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jdk_x64_linux_hotspot_21.0.12.1_1.tar.gz"; then
+      append_log e "Failed to download JDK"
+      return 1
+   fi
+
+   mkdir -p "$jdkInstallDir";
+
+   if ! tar -xzf "$jdkArchivePath" --strip-components=1 -C "$jdkInstallDir"; then
+      append_log e "Failed to extract JDK archive into $jdkInstallDir"
+      return 1
+   fi
+
+   if [[ ! -x "$jdkInstallDir/bin/java" ]]; then
+      append_log e "Java executable not found or not executable at $jdkInstallDir/bin/java"
+      return 1
+   fi
+
+   append_log i "Installed JDK in $jdkInstallDir"
+
+}
+
+function createPrismDesktopEntry {
+   local prismAppimage="$1"
+   local applicationsDir="$HOME/.local/share/applications"
+   local desktopEntry="$applicationsDir/org.prismlauncher.PrismLauncher.desktop"
+   local desktopEntryTemp="$desktopEntry.tmp"
+
+   if ! mkdir -p "$applicationsDir"; then
+      append_log e "Failed to create applications directory $applicationsDir"
+      return 1
+   fi
+
+   if ! cat > "$desktopEntryTemp" <<EOF
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Prism Launcher
+Comment=Prism Launcher appimage
+Exec="$prismAppimage" %U
+Terminal=false
+EOF
+   then
+      append_log e "Failed to write Prism Launcher desktop entry: $desktopEntryTemp"
+      rm -f "$desktopEntryTemp"
+      return 1
+   fi
+
+   if ! chmod u=rw,go=r "$desktopEntryTemp" || ! mv -f "$desktopEntryTemp" "$desktopEntry"; then
+      append_log e "Failed to install Prism Launcher desktop entry: $desktopEntry"
+      rm -f "$desktopEntryTemp"
+      return 1
+   fi
+
+   append_log i "Created Prism Launcher desktop entry at $desktopEntry"
+   echo "Prism Launcher is available in your applications menu."
+}
+
+
+function prismJavaHandlerBazzite {
+   local mcsrDir="$HOME/mcsr"
+   local prismAppimage="$mcsrDir/PrismLauncher.AppImage"
+
+   flatpakPrismHandler || return 1
+   title_print "Installing JDK and prismlauncher (no user input required)"
+   if ! mkdir -p "$mcsrDir"; then
+      append_log e "Failed to create Bazzite install directory $mcsrDir"
+      return 1
+   fi
+   javaHandlerBazzite || return 1
+
+   if ! curl -fL -o "$prismAppimage" "https://github.com/PrismLauncher/PrismLauncher/releases/download/11.1.1/PrismLauncher-Linux-x86_64.AppImage"; then
+      append_log e "Failed to download prismlauncher appImage"
+      return 1
+   fi
+
+   if ! chmod +x "$prismAppimage"; then
+      append_log e "Failed to make prismlauncher appImage executable $prismAppimage"
+      return 1
+   fi
+
+   if ! createPrismDesktopEntry "$prismAppimage"; then
+      echo "Failed to create prismlauncher desktop entry."
+      return 1
+   fi
+
+   append_log i "Downloaded prismlauncher appImage to $prismAppimage"
+}
+
+function waywallBazziteHandler {
+   local mcsrDir="$HOME/mcsr"
+   local waywallArchive="$mcsrDir/waywall.pkg.tar.zst"
+   local waywallInstallDir="$mcsrDir/waywall"
+   local waywallBinary="$waywallInstallDir/usr/bin/waywall"
+   local waywallGLFW="$waywallInstallDir/usr/local/lib64/waywall-glfw/libglfw.so"
+   local dependencies=(
+      libspng-devel
+      cmake
+      meson
+      luajit-devel
+      libwayland-client
+      libwayland-server
+      libwayland-cursor
+      libxkbcommon-devel
+      wayland-devel
+      wayland-protocols-devel
+   )
+
+   title_print "Installing Waywall for Bazzite"
+   append_log i "Installing Waywall dependencies on Bazzite"
+   if ! sudo rpm-ostree install --idempotent -y "${dependencies[@]}"; then
+      append_log e "Failed to install Waywall dependencies on Bazzite"
+      return 1
+   fi
+
+   if ! curl -fL -o "$waywallArchive" "https://github.com/tesselslate/waywall/releases/download/0.2026.06.13/waywall-0.5-1-x86_64.pkg.tar.zst"; then
+      append_log e "Failed to download the Waywall Arch package for Bazzite"
+      return 1
+   fi
+
+   if ! mkdir -p "$waywallInstallDir"; then
+      append_log e "Failed to create Waywall installation directory: $waywallInstallDir"
+      return 1
+   fi
+
+   if ! tar --zstd -xf "$waywallArchive" -C "$waywallInstallDir"; then
+      append_log e "Failed to extract Waywall package into $waywallInstallDir"
+      return 1
+   fi
+   
+   append_log i "Waywall binary installed at $waywallBinary"
+   append_log i "Waywall GLFW library installed at $waywallGLFW"
+   append_log i "waywall folder: $(ls -l "$waywallInstallDir")"
+   echo "Waywall was extracted into $waywallInstallDir."
+   
 }
 function mainMenu {
    local menuChoice=""
@@ -1206,8 +1531,34 @@ function mainMenu {
             osHandler || return 1
             waywallConfigHandler || return 1
             title_print "Waywall and Prism Setup Complete"
-            echo
+            echo ""
+            echo ""
+            echo ""
             additionalInforForUser
+             while true; do
+             title_print "BAZZITE"
+               if ! read -r -p "Bazzite setup done. YOU MUST reboot your system for dependancies to take in effect. Do you want to reboot now? [y/n]: " rebootChoice; then
+                  rebootChoice="n"
+               fi
+               case "$(to_lowercase "$rebootChoice")" in
+                  y|yes)
+                     append_log i "no reboot after Bazzite setup"
+                     if ! sudo systemctl reboot; then
+                        append_log e "Failed to reboot after Bazzite setup"
+                        echo "Something went wrong while auto reboot, please reboot manually to apply the changes."
+                     fi
+                     break
+                     ;;
+                  n|no)
+                     append_log i "No reboot after Bazzite setup."
+                     echo "YOU MUST reboot your system for waywall to work , Please reboot your system later."
+                     break
+                     ;;
+                  *)
+                     echo "Invalid choice. Please type y or n."
+                     ;;
+               esac
+            done
             return 0
             ;;
          2)

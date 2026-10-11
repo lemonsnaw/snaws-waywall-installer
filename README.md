@@ -8,6 +8,7 @@ This script is provided as-is, without warranty. It will install system packages
 - Ubuntu 26.01+
 - Debian 13+
 - Arch and Cachyos ( Any Arch based OS should work but I havent added all of them since I havent tested them)
+- Bazzite
 
 ## Purpose
 This is script does following:
@@ -39,7 +40,6 @@ Currently Added plugins:
 - Oneshot crosshair (https://github.com/lemonsnaw/ww_oneshot_crosshair)
 
 ## Current development plans:
-- Bazzite Supports
 - Plugins URI support ( to add plugins which are not hardcoded) in plugins folder.
 
 ## Adding new distro
@@ -104,4 +104,3 @@ Currently Added plugins:
 - [vojta](https://github.com/votisek) review on script as well as general advice and prism config writing.
 
 and many more people in [linux mcsr cord](https://discord.com/invite/3tm4UpUQ8t) who helped and adviced along the way
-
