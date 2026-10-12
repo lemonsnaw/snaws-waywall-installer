@@ -779,7 +779,7 @@ function waywallArchBasedHandler {
       echo "Waywall is not installed, proceeding with installation"
       append_log i "Downloading waywall.pkg.tar.zst"
 
-      curl -fL -o "$waywallpkgPath" "https://github.com/tesselslate/waywall/releases/download/0.2026.06.13/waywall-0.5-1-x86_64.pkg.tar.zst"
+      curl -fL -o "$waywallpkgPath" "https://github.com/tesselslate/waywall/releases/download/0.2026.10.12b/waywall-0.5-1-x86_64.pkg.tar.zst"
       waywallDownload=$?
       if [[ $waywallDownload -ne 0 ]]; then
          append_log e "Failed to download waywall.pkg.tar.zst"
@@ -817,7 +817,7 @@ function waywallUbuntuHandler {
       echo "Waywall is not installed, proceeding with installation"
       append_log i "Downloading waywall.deb"
 
-      curl -fL -o "$waywallDebPath" "https://github.com/tesselslate/waywall/releases/download/0.2026.06.13/waywall_0.5-1_amd64.deb"
+      curl -fL -o "$waywallDebPath" "https://github.com/tesselslate/waywall/releases/download/0.2026.10.12b/waywall_0.5-1_amd64.deb"
       waywallDownload=$?
       if [[ $waywallDownload -ne 0 ]]; then
          append_log e "Failed to download waywall.deb"
@@ -855,7 +855,7 @@ function waywallFedoraNobaraHandler {
       echo "Waywall is not installed, proceeding with installation"
       append_log i "Downloading waywall.rpm"
     
-      curl -fL -o "$waywallRpmPath" https://github.com/tesselslate/waywall/releases/download/0.2026.06.13/waywall-0.5-1.fc42.x86_64.rpm
+      curl -fL -o "$waywallRpmPath" https://github.com/tesselslate/waywall/releases/download/0.2026.10.12b/waywall-0.5-1.fc42.x86_64.rpm
       waywallDownload=$?
       if [[ $waywallDownload -ne 0 ]]; then
          append_log e "Failed to download waywall.rpm"
@@ -1493,7 +1493,7 @@ function waywallBazziteHandler {
       return 1
    fi
 
-   if ! curl -fL -o "$waywallArchive" "https://github.com/tesselslate/waywall/releases/download/0.2026.06.13/waywall-0.5-1-x86_64.pkg.tar.zst"; then
+   if ! curl -fL -o "$waywallArchive" "https://github.com/tesselslate/waywall/releases/download/0.2026.10.12b/waywall-0.5-1-x86_64.pkg.tar.zst"; then
       append_log e "Failed to download the Waywall Arch package for Bazzite"
       return 1
    fi
