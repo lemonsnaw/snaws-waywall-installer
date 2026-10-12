@@ -1535,30 +1535,33 @@ function mainMenu {
             echo ""
             echo ""
             additionalInforForUser
-             while true; do
-             title_print "BAZZITE"
-               if ! read -r -p "Bazzite setup done. YOU MUST reboot your system for dependancies to take in effect. Do you want to reboot now? [y/n]: " rebootChoice; then
-                  rebootChoice="n"
-               fi
-               case "$(to_lowercase "$rebootChoice")" in
-                  y|yes)
-                     append_log i "no reboot after Bazzite setup"
-                     if ! sudo systemctl reboot; then
-                        append_log e "Failed to reboot after Bazzite setup"
-                        echo "Something went wrong while auto reboot, please reboot manually to apply the changes."
-                     fi
-                     break
-                     ;;
-                  n|no)
-                     append_log i "No reboot after Bazzite setup."
-                     echo "YOU MUST reboot your system for waywall to work , Please reboot your system later."
-                     break
-                     ;;
-                  *)
-                     echo "Invalid choice. Please type y or n."
-                     ;;
-               esac
-            done
+            if [[  $OS_ID == "bazzite" ]]; then 
+
+               while true; do
+               title_print "BAZZITE"
+                  if ! read -r -p "Bazzite setup done. YOU MUST reboot your system for dependancies to take in effect. Do you want to reboot now? [y/n]: " rebootChoice; then
+                     rebootChoice="n"
+                  fi
+                  case "$(to_lowercase "$rebootChoice")" in
+                     y|yes)
+                        append_log i "no reboot after Bazzite setup"
+                        if ! sudo systemctl reboot; then
+                           append_log e "Failed to reboot after Bazzite setup"
+                           echo "Something went wrong while auto reboot, please reboot manually to apply the changes."
+                        fi
+                        break
+                        ;;
+                     n|no)
+                        append_log i "No reboot after Bazzite setup."
+                        echo "YOU MUST reboot your system for waywall to work , Please reboot your system later."
+                        break
+                        ;;
+                     *)
+                        echo "Invalid choice. Please type y or n."
+                        ;;
+                  esac
+               done
+            fi
             return 0
             ;;
          2)
